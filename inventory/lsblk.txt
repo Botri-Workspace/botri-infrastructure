@@ -1,0 +1,23 @@
+NAME         FSTYPE   FSVER LABEL           UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
+loop0        squashfs 4.0                                                              0   100% /snap/amazon-ssm-agent/13009
+loop1        squashfs 4.0                                                              0   100% /snap/amazon-ssm-agent/13349
+loop2        squashfs 4.0                                                              0   100% /snap/snapd/27591
+loop3        squashfs 4.0                                                              0   100% /snap/core22/2411
+loop5        squashfs 4.0                                                              0   100% /snap/core20/2866
+loop6        squashfs 4.0                                                              0   100% /snap/snapd/27406
+loop7        squashfs 4.0                                                              0   100% /snap/core24/1643
+loop8        squashfs 4.0                                                              0   100% /snap/bare/5
+loop9        squashfs 4.0                                                              0   100% /snap/cups/1225
+loop10       squashfs 4.0                                                              0   100% /snap/code/253
+loop11       squashfs 4.0                                                              0   100% /snap/gtk-common-themes/1535
+loop12       squashfs 4.0                                                              0   100% /snap/mesa-2404/1165
+loop13       squashfs 4.0                                                              0   100% /snap/gnome-46-2404/164
+loop14       squashfs 4.0                                                              0   100% /snap/chromium/3491
+loop15       squashfs 4.0                                                              0   100% /snap/chromium/3499
+loop16       squashfs 4.0                                                              0   100% /snap/cups/1229
+loop17       squashfs 4.0                                                              0   100% /snap/code/252
+nvme0n1                                                                                         
+├─nvme0n1p1  ext4     1.0   cloudimg-rootfs 553eb6f0-df3b-48cf-b8d3-48b8d7fe5b76    2.5G    86% /
+├─nvme0n1p13 ext4     1.0   BOOT            005a5132-2768-402e-b8f5-1e31db26b1b6  747.5M    18% /boot
+├─nvme0n1p14                                                                                    
+└─nvme0n1p15 vfat     FAT32 UEFI            032C-9E93                              98.1M     6% /boot/efi
