@@ -1,0 +1,9 @@
+total 32
+drwx------  3 ubuntu ubuntu 4096 Jul 10 15:33 .
+drwxr-x--- 37 ubuntu ubuntu 4096 Jul 27 14:21 ..
+drwx------  2 ubuntu ubuntu 4096 Jul 25 22:57 agent
+-rw-------  1 ubuntu ubuntu  403 Jun 26 18:07 authorized_keys
+-rw-------  1 ubuntu ubuntu  411 Jun 26 18:46 id_ed25519
+-rw-r--r--  1 ubuntu ubuntu  103 Jun 26 18:46 id_ed25519.pub
+-rw-------  1 ubuntu ubuntu 1956 Jul 10 01:27 known_hosts
+-rw-------  1 ubuntu ubuntu 1120 Jul 10 01:23 known_hosts.old
