@@ -1,0 +1,196 @@
+./.vscode-server/cli/servers/Stable-125df4672b8a6a34975303c6b0baa124e560a4f7/server/extensions/typescript-language-features/resources/walkthroughs/install-node-js.svg
+./.vscode-server/cli/servers/Stable-125df4672b8a6a34975303c6b0baa124e560a4f7/server/out/bootstrap-fork.js
+./.vscode-server/cli/servers/Stable-1b6a188127eeaf9194f945eb6eb89a657e93c54c/server/extensions/typescript-language-features/resources/walkthroughs/install-node-js.svg
+./.vscode-server/cli/servers/Stable-1b6a188127eeaf9194f945eb6eb89a657e93c54c/server/out/bootstrap-fork.js
+./.vscode-server/cli/servers/Stable-4fe60c8b1cdac1c4c174f2fb180d0d758272d713/server/extensions/typescript-language-features/resources/walkthroughs/install-node-js.svg
+./.vscode-server/cli/servers/Stable-4fe60c8b1cdac1c4c174f2fb180d0d758272d713/server/out/bootstrap-fork.js
+./.vscode-server/cli/servers/Stable-5264f2156cbcd7aea5fd004d29eaa10209155d66/server/extensions/typescript-language-features/resources/walkthroughs/install-node-js.svg
+./.vscode-server/cli/servers/Stable-5264f2156cbcd7aea5fd004d29eaa10209155d66/server/out/bootstrap-fork.js
+./.vscode-server/cli/servers/Stable-8a7abeba6e03ea3af87bfbce9a1b7e48fed567b8/server/extensions/typescript-language-features/resources/walkthroughs/install-node-js.svg
+./.vscode-server/cli/servers/Stable-8a7abeba6e03ea3af87bfbce9a1b7e48fed567b8/server/out/bootstrap-fork.js
+./.vscode-server/extensions/github.vscode-github-actions-0.32.3/script/bootstrap
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/et_xmlfile-2.0.0.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy-2.4.6.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_core/tests/examples/cython/__pycache__/setup.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_core/tests/examples/cython/setup.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_core/tests/examples/limited_api/__pycache__/setup.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_core/tests/examples/limited_api/setup.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_pyinstaller/tests/__pycache__/pyinstaller-smoke.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_pyinstaller/tests/__pycache__/test_pyinstaller.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_pyinstaller/tests/pyinstaller-smoke.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/_pyinstaller/tests/test_pyinstaller.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/numpy/f2py/setup.cfg
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/openpyxl-3.1.5.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pandas-3.0.3.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip-25.1.1.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/commands/__pycache__/install.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/commands/__pycache__/uninstall.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/commands/install.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/commands/uninstall.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/distributions/__pycache__/installed.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/distributions/installed.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/models/__pycache__/installation_report.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/models/installation_report.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/req/__pycache__/req_install.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/req/__pycache__/req_uninstall.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/req/req_install.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/req/req_uninstall.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/utils/__pycache__/setuptools_build.cpython-314.pyc
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pip/_internal/utils/setuptools_build.py
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pyaes-1.6.1.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/pyasn1-0.6.3.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/python_dateutil-2.9.0.post0.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/python_dotenv-1.2.2.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/rsa-4.9.1.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/six-1.17.0.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/telethon-1.43.2.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot/.venv/lib/python3.14/site-packages/tzdata-2026.2.dist-info/INSTALLER
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri Low Resource Workstation Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri Workstation Markdown Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Catch-All Email Routing Rule Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Catch-All Email Routing Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare Activation & Email Routing Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare DNS Migration Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare Email Activation Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare Email Routing Final Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Domain Activation Completed & Email Routing Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Domain Email Forwarding Setup Complete Near Final Stage
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Domain Email Setup Roadmap
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Email Routing Configuration Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Email Routing DNS Final Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Free Domain Email Infrastructure Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Free Email Ecosystem Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Dell Inspiron Personal Workstation Setup 2026
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Email Command Center Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Fiverr/Account Setup/BotriLabs Fiverr Profile Manual Setup Phase 4
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Fiverr/Account Setup/BotriLabs Fiverr Seller Profile Setup Phase 3
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Fiverr/Account Setup/Fiverr Seller Account Build Phase 2 – Identity Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Fiverr/Account Setup/Fiverr Seller Account Setup Phase 1
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/GitHub Repository Structure Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Nimron/Nimron Digital Identity Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Notepad++ Markdown Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Print Screen Key Activation Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/Windows 7 Print Screen Automation Setup
+./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base/chats/deriv/api/04 Deriv App Builder Deployment Investigation
+./Archive/BOTRI-LAB/GitHub/Price-Monitor-Bot/docs/deployment.md
+./Archive/BOTRI-LAB/GitHub/Price-Monitor-Bot/docs/setup.md
+./Archive/BOTRI-LAB/GitHub/botri-workspace/DEV-SETUP.md
+./Archive/BOTRI-LAB/GitHub/bwms-core/docs/guides/GITHUB_MULTI_ACCOUNT_WORKSPACE_SETUP.md
+./Archive/BOTRI-LAB/GitHub/iqbinary-deriv-lab/AI-RULEBOOK.v1.backup.md
+./Archive/BOTRI-LAB/GitHub/iqbinary-deriv-lab/src/bootstrap/botriBootstrap.js
+./Archive/BOTRI-LAB/GitHub/iqbinary-deriv-lab/src/core/bootstrap.js
+./Archive/BOTRI-LAB/GitHub/iqbinary-deriv-lab/src/tests/bootstrapTest.js
+./Archive/BOTRI-LAB/GitHub/iqbinary-deriv-lab/src/workspaces/signal-bot/strategies/ConsecutiveTickStrategy.js.backup
+./Archive/BOTRI-LAB/iqbinary-deriv-lab/.env.backup.before-appid-test
+./Archive/BOTRI-LAB/iqbinary-deriv-lab/.env.backup.before-pat-config
+./Archive/BOTRI-LAB/iqbinary-deriv-lab/AI-RULEBOOK.v1.backup.md
+./Archive/BOTRI-LAB/iqbinary-deriv-lab/src/bootstrap/botriBootstrap.js
+./Archive/BOTRI-LAB/iqbinary-deriv-lab/src/core/bootstrap.js
+./Archive/BOTRI-LAB/iqbinary-deriv-lab/src/tests/bootstrapTest.js
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri Low Resource Workstation Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri Workstation Markdown Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Catch-All Email Routing Rule Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Catch-All Email Routing Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Cloudflare Activation & Email Routing Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Cloudflare DNS Migration Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Cloudflare Email Activation Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Cloudflare Email Routing Final Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Domain Activation Completed & Email Routing Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Domain Email Forwarding Setup Complete Near Final Stage
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Domain Email Setup Roadmap
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Email Routing Configuration Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Email Routing DNS Final Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Free Domain Email Infrastructure Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Botri/Domain/Email/Botri Free Email Ecosystem Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Dell Inspiron Personal Workstation Setup 2026
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Email Command Center Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Fiverr/Account Setup/BotriLabs Fiverr Profile Manual Setup Phase 4
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Fiverr/Account Setup/BotriLabs Fiverr Seller Profile Setup Phase 3
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Fiverr/Account Setup/Fiverr Seller Account Build Phase 2 – Identity Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Fiverr/Account Setup/Fiverr Seller Account Setup Phase 1
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/GitHub Repository Structure Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Nimron/Nimron Digital Identity Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Notepad++ Markdown Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Print Screen Key Activation Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/Windows 7 Print Screen Automation Setup
+./Botri-Workspace/Botri-Knowledge-Base-Archive/chats/deriv/api/04 Deriv App Builder Deployment Investigation
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri Low Resource Workstation Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri Workstation Markdown Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Catch-All Email Routing Rule Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Catch-All Email Routing Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare Activation & Email Routing Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare DNS Migration Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare Email Activation Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Cloudflare Email Routing Final Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Domain Activation Completed & Email Routing Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Domain Email Forwarding Setup Complete Near Final Stage
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Domain Email Setup Roadmap
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Email Routing Configuration Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Email Routing DNS Final Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Free Domain Email Infrastructure Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Botri/Domain/Email/Botri Free Email Ecosystem Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Dell Inspiron Personal Workstation Setup 2026
+./Botri-Workspace/Botri-Knowledge-Base/chats/Email Command Center Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Fiverr/Account Setup/BotriLabs Fiverr Profile Manual Setup Phase 4
+./Botri-Workspace/Botri-Knowledge-Base/chats/Fiverr/Account Setup/BotriLabs Fiverr Seller Profile Setup Phase 3
+./Botri-Workspace/Botri-Knowledge-Base/chats/Fiverr/Account Setup/Fiverr Seller Account Build Phase 2 – Identity Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Fiverr/Account Setup/Fiverr Seller Account Setup Phase 1
+./Botri-Workspace/Botri-Knowledge-Base/chats/GitHub Repository Structure Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Nimron/Nimron Digital Identity Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Notepad++ Markdown Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Print Screen Key Activation Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/Windows 7 Print Screen Automation Setup
+./Botri-Workspace/Botri-Knowledge-Base/chats/deriv/api/04 Deriv App Builder Deployment Investigation
+./Botri-Workspace/Official-Repos/deriv-api-docs/i18n/fr/docusaurus-plugin-content-docs/current/_intro_backup.md
+./Botri-Workspace/Official-Repos/deriv-api-docs/jest.setup.ts
+./Botri-Workspace/Price-Monitor-Bot/docs/deployment.md
+./Botri-Workspace/Price-Monitor-Bot/docs/setup.md
+./Botri-Workspace/botri-bot/jest.setup.ts
+./Botri-Workspace/botri-bot/src/app/CoreStoreProvider.tsx
+./Botri-Workspace/botri-infrastructure/backup/backup.sh
+./Botri-Workspace/botri-infrastructure/bootstrap/bootstrap.sh
+./Botri-Workspace/botri-infrastructure/bootstrap/install-node.sh
+./Botri-Workspace/botri-infrastructure/bootstrap/install-playwright.sh
+./Botri-Workspace/botri-infrastructure/bootstrap/install-pm2.sh
+./Botri-Workspace/botri-infrastructure/deployment/deploy.sh
+./Botri-Workspace/botri-infrastructure/restore/restore.sh
+./Botri-Workspace/botri-living-knowledge/chatgpt-chat-conversations/Botri Memory System Discussion/Response-009 – Sprint-001 Repository Bootstrap Kickoff
+./Botri-Workspace/botri-living-knowledge/chatgpt-chat-conversations/Botri Memory System Discussion/Response-013 – Sprint-001 Task-001 Repository Bootstrap
+./Botri-Workspace/botri-workspace/DEV-SETUP.md
+./Botri-Workspace/claim-automation-platform/docs/DEPLOYMENT.md
+./Botri-Workspace/claim-automation-platform/scripts/bootstrap.sh
+./Botri-Workspace/claim-automation-platform/scripts/deploy.sh
+./Botri-Workspace/claim-automation-platform/src/bootstrap/bootstrap.js
+./Botri-Workspace/claim-automation-platform/src/runtime/runtimeBootstrap.js
+./Botri-Workspace/gpos/scripts/bootstrap.sh
+./Botri-Workspace/gpos/scripts/install.sh
+./Botri-Workspace/iqbinary-deriv-lab/.env.backup.2026-07-15-100906
+./Botri-Workspace/iqbinary-deriv-lab/AI-RULEBOOK.v1.backup.md
+./Botri-Workspace/iqbinary-deriv-lab/src/bootstrap/botriBootstrap.js
+./Botri-Workspace/iqbinary-deriv-lab/src/core/bootstrap.js
+./Botri-Workspace/iqbinary-deriv-lab/src/tests/bootstrapTest.js
+./deriv-rnd/botri-live-process/lab/03-standalone-trade-test/raw/trade-engine-bootstrap-and-proposal-lifecycle.txt
+./deriv-rnd/botri-vnext/botri/core/__pycache__/bootstrap.cpython-314.pyc
+./deriv-rnd/botri-vnext/botri/core/bootstrap.py
+./deriv-rnd/botri-vnext/docs/evidence/registry/ARTIFACT_REGISTRY.backup.json
+./deriv-rnd/botri-vnext/docs/evidence/registry/EVIDENCE_REGISTRY.backup.json
+./deriv-rnd/deriv-api/.github/workflows/docs-build-deploy.yml
+./deriv-rnd/deriv-app/jest.setup.js
+./deriv-rnd/deriv-app/packages/appstore/src/components/modals/setup-real-account-or-go-to-demo-modal/__tests__/setup-real-account-or-go-to-demo-modal-content.spec.tsx
+./deriv-rnd/deriv-app/packages/appstore/src/components/modals/setup-real-account-or-go-to-demo-modal/__tests__/setup-real-account-or-go-to-demo-modal.spec.tsx
+./deriv-rnd/deriv-app/packages/appstore/src/components/modals/setup-real-account-or-go-to-demo-modal/setup-real-account-or-go-to-demo-modal-content.tsx
+./deriv-rnd/deriv-app/packages/appstore/src/components/modals/setup-real-account-or-go-to-demo-modal/setup-real-account-or-go-to-demo-modal.scss
+./deriv-rnd/deriv-app/packages/appstore/src/components/modals/setup-real-account-or-go-to-demo-modal/setup-real-account-or-go-to-demo-modal.tsx
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-full-screen-restore.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-apple.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-google.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-huawei.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-linux.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-macos.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-web-demo.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-web-real.svg
+./deriv-rnd/deriv-app/packages/components/src/components/icon/common/ic-installation-windows.svg
+./deriv-rnd/deriv-app/packages/wallets/src/public/images/ic-installation-apple.svg
+./deriv-rnd/deriv-app/packages/wallets/src/public/images/ic-installation-google.svg
+./deriv-rnd/deriv-app/packages/wallets/src/public/images/ic-installation-huawei.svg
+./deriv-rnd/deriv-app/setupTests.js
