@@ -1,0 +1,152 @@
+
+===== ./BOTRI-ORG/.github =====
+origin	https://github.com/Botri-Workspace/.github.git (fetch)
+origin	https://github.com/Botri-Workspace/.github.git (push)
+
+===== ./Botri-Workspace/botri-templates =====
+origin	https://github.com/Botri-Workspace/botri-templates.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-templates.git (push)
+
+===== ./Botri-Workspace/botri-standards =====
+origin	https://github.com/Botri-Workspace/botri-standards.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-standards.git (push)
+
+===== ./Botri-Workspace/Official-Repos/deriv-api-docs =====
+upstream	https://github.com/deriv-com/deriv-api-docs.git (fetch)
+upstream	DISABLED (push)
+
+===== ./Botri-Workspace/botri-docs =====
+origin	https://github.com/Botri-Workspace/botri-docs.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-docs.git (push)
+
+===== ./Botri-Workspace/botri-bot =====
+origin	https://github.com/Botri-Workspace/botri-bot.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-bot.git (push)
+
+===== ./Botri-Workspace/Botri-Knowledge-Base =====
+origin	https://github.com/Botri-Workspace/Botri-Knowledge-Base.git (fetch)
+origin	https://github.com/Botri-Workspace/Botri-Knowledge-Base.git (push)
+
+===== ./Botri-Workspace/botri-governance =====
+origin	https://github.com/Botri-Workspace/botri-governance.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-governance.git (push)
+
+===== ./Botri-Workspace/gpos =====
+origin	https://github.com/Botri-Workspace/gpos.git (fetch)
+origin	https://github.com/Botri-Workspace/gpos.git (push)
+
+===== ./Botri-Workspace/Price-Monitor-Bot =====
+origin	https://github.com/Botri-Workspace/Price-Monitor-Bot.git (fetch)
+origin	https://github.com/Botri-Workspace/Price-Monitor-Bot.git (push)
+
+===== ./Botri-Workspace/botri-infrastructure =====
+origin	https://github.com/Botri-Workspace/botri-infrastructure.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-infrastructure.git (push)
+
+===== ./Botri-Workspace/BinaryBot =====
+origin	https://github.com/Botri-Workspace/BinaryBot.git (fetch)
+origin	https://github.com/Botri-Workspace/BinaryBot.git (push)
+
+===== ./Botri-Workspace/ChatGpt =====
+origin	https://github.com/Botri-Workspace/ChatGpt.git (fetch)
+origin	https://github.com/Botri-Workspace/ChatGpt.git (push)
+
+===== ./Botri-Workspace/botri-living-knowledge =====
+origin	https://github.com/Botri-Workspace/botri-living-knowledge.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-living-knowledge.git (push)
+
+===== ./Botri-Workspace/claim-automation-platform =====
+origin	https://github.com/Botri-Workspace/claim-automation-platform.git (fetch)
+origin	https://github.com/Botri-Workspace/claim-automation-platform.git (push)
+
+===== ./Botri-Workspace/notes-manager =====
+
+===== ./Botri-Workspace/iqbinary-deriv-lab =====
+origin	https://github.com/Botri-Workspace/iqbinary-deriv-lab.git (fetch)
+origin	https://github.com/Botri-Workspace/iqbinary-deriv-lab.git (push)
+
+===== ./Botri-Workspace/botri-workspace =====
+origin	https://github.com/Botri-Workspace/botri-workspace.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-workspace.git (push)
+
+===== ./Botri-Workspace/Botri-Command-Centre =====
+origin	https://github.com/Botri-Workspace/Botri-Command-Centre.git (fetch)
+origin	https://github.com/Botri-Workspace/Botri-Command-Centre.git (push)
+
+===== ./Botri-Workspace/Binance-Treasure-Bot =====
+origin	https://github.com/binancetreasurebot/Binance-Treasure-Bot.git (fetch)
+origin	https://github.com/binancetreasurebot/Binance-Treasure-Bot.git (push)
+
+===== ./Botri-Workspace/BOTRI-Deriv-Knowledge =====
+origin	https://github.com/Botri-Workspace/BOTRI-Deriv-Knowledge.git (fetch)
+origin	https://github.com/Botri-Workspace/BOTRI-Deriv-Knowledge.git (push)
+
+===== ./Botri-Workspace/Botri-Knowledge-Base-Archive =====
+origin	https://github.com/Botri-Workspace/Botri-Knowledge-Base-Archive.git (fetch)
+origin	https://github.com/Botri-Workspace/Botri-Knowledge-Base-Archive.git (push)
+
+===== ./Botri-Workspace/botri-assets =====
+origin	https://github.com/Botri-Workspace/botri-assets.git (fetch)
+origin	https://github.com/Botri-Workspace/botri-assets.git (push)
+
+===== ./Archive/dbot-engineering-lab =====
+origin	git@github.com:IQBinary/dbot-engineering-lab.git (fetch)
+origin	git@github.com:IQBinary/dbot-engineering-lab.git (push)
+
+===== ./Archive/IQBinaryBot =====
+origin	git@github.com:IQBinary/IQBinaryBot.git (fetch)
+origin	git@github.com:IQBinary/IQBinaryBot.git (push)
+
+===== ./Archive/BOTRI-LAB/GitHub/bwms-core =====
+origin	git@github.com:IQBinaryBot/bwms-core.git (fetch)
+origin	git@github.com:IQBinaryBot/bwms-core.git (push)
+
+===== ./Archive/BOTRI-LAB/GitHub/Botri-Knowledge-Base =====
+origin	git@github.com:IQBinaryBot/Botri-Knowledge-Base.git (fetch)
+origin	git@github.com:IQBinaryBot/Botri-Knowledge-Base.git (push)
+
+===== ./Archive/BOTRI-LAB/GitHub/Price-Monitor-Bot =====
+origin	git@github.com:IQBinaryBot/Price-Monitor-Bot.git (fetch)
+origin	git@github.com:IQBinaryBot/Price-Monitor-Bot.git (push)
+
+===== ./Archive/BOTRI-LAB/GitHub/iqbinary-deriv-lab =====
+origin	git@github.com:IQBinaryBot/iqbinary-deriv-lab.git (fetch)
+origin	git@github.com:IQBinaryBot/iqbinary-deriv-lab.git (push)
+
+===== ./Archive/BOTRI-LAB/GitHub/botri-workspace =====
+origin	git@github.com:IQBinaryBot/botri-workspace.git (fetch)
+origin	git@github.com:IQBinaryBot/botri-workspace.git (push)
+
+===== ./Archive/BOTRI-LAB/GitHub/Botri-Command-Centre =====
+origin	git@github.com:IQBinaryBot/Botri-Command-Centre.git (fetch)
+origin	git@github.com:IQBinaryBot/Botri-Command-Centre.git (push)
+
+===== ./Archive/BOTRI-LAB/GitHub/Binance-Treasure-Bot =====
+origin	https://github.com/binancetreasurebot/Binance-Treasure-Bot.git (fetch)
+origin	https://github.com/binancetreasurebot/Binance-Treasure-Bot.git (push)
+
+===== ./Archive/BOTRI-LAB/iqbinary-deriv-lab =====
+origin	https://github.com/IQBinaryBot/iqbinary-deriv-lab.git (fetch)
+origin	https://github.com/IQBinaryBot/iqbinary-deriv-lab.git (push)
+
+===== ./botri-digit-hunter =====
+origin	git@github.com:botri-botri/botri-digit-hunter.git (fetch)
+origin	git@github.com:botri-botri/botri-digit-hunter.git (push)
+
+===== ./deriv-rnd/deriv-api-client =====
+origin	https://github.com/deriv-com/deriv-api-client.git (fetch)
+origin	https://github.com/deriv-com/deriv-api-client.git (push)
+
+===== ./deriv-rnd/deriv-app =====
+origin	https://github.com/deriv-com/deriv-app.git (fetch)
+origin	https://github.com/deriv-com/deriv-app.git (push)
+
+===== ./deriv-rnd/botri-vnext =====
+
+===== ./deriv-rnd/deriv-api =====
+origin	https://github.com/deriv-com/deriv-api.git (fetch)
+origin	https://github.com/deriv-com/deriv-api.git (push)
+
+===== ./Binance-Treasure-Bot =====
+origin	https://github.com/binancetreasurebot/Binance-Treasure-Bot.git (fetch)
+origin	https://github.com/binancetreasurebot/Binance-Treasure-Bot.git (push)
