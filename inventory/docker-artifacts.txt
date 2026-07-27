@@ -1,0 +1,5 @@
+./.pm2/modules/pm2-logrotate/node_modules/pmx/docker-compose.yml
+./Botri-Workspace/Official-Repos/deriv-api-docs/Dockerfile
+./Botri-Workspace/Official-Repos/deriv-api-docs/compose.yml
+./Botri-Workspace/Official-Repos/deriv-api-docs/nginx/Dockerfile
+./deriv-rnd/deriv-app/Dockerfile
