@@ -56,11 +56,15 @@ jobs:
         run: |
           set -euo pipefail
           case "$APPLICATION_PATH" in
+            /home/ubuntu/Botri-Workspace/*[!A-Za-z0-9._/-]*) echo 'Rejected: invalid application_path'; exit 2 ;;
             /home/ubuntu/Botri-Workspace/*) ;;
             *) echo 'Rejected: application_path must be under /home/ubuntu/Botri-Workspace'; exit 2 ;;
           esac
           case "$TARGET_REPOSITORY" in
-            *[!A-Za-z0-9._-]*) echo 'Rejected: invalid target_repository'; exit 2 ;;
+            ''|*[!A-Za-z0-9._-]*) echo 'Rejected: invalid target_repository'; exit 2 ;;
+          esac
+          case "$TARGET_REF" in
+            ''|*[!A-Za-z0-9._/-]*|*..*|/*) echo 'Rejected: invalid target_ref'; exit 2 ;;
           esac
           case "$RUNTIME_ACTION" in
             none|restart|reload) ;;
