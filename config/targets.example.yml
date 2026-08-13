@@ -1,0 +1,19 @@
+# Target contract example
+
+# This file documents the shape only. Real instance IDs and environment values
+# live in GitHub Environments / AWS, never in Git.
+
+targets:
+  - repository: botri-market-data
+    environment: production
+    applicationPath: /home/ubuntu/Botri-Workspace/botri-market-data
+    runtimeManager: pm2
+
+  - repository: iqbinary-deriv-lab
+    environment: production
+    applicationPath: /home/ubuntu/Botri-Workspace/iqbinary-deriv-lab
+    runtimeManager: pm2
+
+# Infrastructure owns the transport and execution mechanism.
+# Each application repository owns its own source, dependencies, tests,
+# configuration contract, and runtime semantics.
