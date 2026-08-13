@@ -1,0 +1,11 @@
+.DS_Store
+.env
+.env.*
+*.pem
+*.key
+*.crt
+ssm-result.json
+deployment-result.json
+artifacts/
+runtime/
+logs/

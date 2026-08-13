@@ -1,1 +1,0 @@
-Linux ip-172-31-46-63 7.0.0-1008-aws #8-Ubuntu SMP PREEMPT Fri Jun 19 00:15:35 UTC 2026 x86_64 GNU/Linux

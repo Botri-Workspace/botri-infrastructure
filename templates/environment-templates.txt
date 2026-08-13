@@ -1,9 +1,0 @@
-./.pm2/modules/pm2-logrotate/node_modules/cron-parser/test/crontab.example
-./Archive/BOTRI-LAB/GitHub/Price-Monitor-Bot/.env.example
-./Archive/BOTRI-LAB/GitHub/iqbinary-deriv-lab/.env.example
-./Archive/BOTRI-LAB/iqbinary-deriv-lab/.env.example
-./Botri-Workspace/Price-Monitor-Bot/.env.example
-./Botri-Workspace/botri-infrastructure/templates/.env.example
-./Botri-Workspace/claim-automation-platform/.env.example
-./Botri-Workspace/iqbinary-deriv-lab/.env.example
-./deriv-rnd/deriv-app/nx-cloud.env.example

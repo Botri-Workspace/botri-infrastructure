@@ -1,0 +1,51 @@
+name: EC2 Read-Only Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment containing AWS configuration
+        required: true
+        default: production
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Verify EC2 through SSM
+        id: ssm
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "botri-infrastructure read-only verification" \
+            --parameters 'commands=["set -e","echo HOST=$(hostname)","echo DATE=$(date -Is)","echo USER=$(id -un)","echo PWD=$(pwd)","echo KERNEL=$(uname -sr)","echo GIT_STATUS=$(git -C /home/ubuntu/Botri-Workspace/iqbinary-deriv-lab status --short --branch 2>/dev/null || true)","echo PM2_STATUS_START","pm2 status 2>/dev/null || true","echo PM2_STATUS_END"]' \
+            --query 'Command.CommandId' --output text)
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" > ssm-result.json
+          cat ssm-result.json
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ec2-readonly-verification-${{ github.run_id }}
+          path: ssm-result.json

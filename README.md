@@ -1,65 +1,54 @@
 # Botri Infrastructure
 
-> **Infrastructure-as-code and operational infrastructure layer for Botri Workspace systems.**
+Central infrastructure and operational automation layer for the Botri Workspace.
 
-## Purpose
+## Ownership
 
-`botri-infrastructure` provides the infrastructure foundation required to deploy, operate, and support Botri services and environments.
+This repository owns AWS/EC2 infrastructure automation, deployment orchestration, runtime verification, operational evidence, and environment contracts.
 
-## Scope
+It does **not** own application business logic or market-data storage.
 
-Infrastructure responsibilities may include:
+## Repository boundaries
 
-- deployment configuration
-- server / host setup
-- environment provisioning
-- service configuration
-- operational automation
-- infrastructure documentation
-- repeatable environment definitions
+- `botri-market-data` — canonical market-data ingestion, storage, retention, recovery, integrity, and data-access contracts.
+- `iqbinary-deriv-lab` — trading/signal application logic and research.
+- `botri-infrastructure` — shared AWS/EC2 execution and operational automation.
 
-## Boundary
+## Automation model
 
 ```text
-Botri Applications / Services
-          ↓
-Botri Infrastructure
-          ↓
-Compute / Network / Runtime Environment
+GitHub repository / Issue / PR
+            |
+            v
+   botri-infrastructure
+            |
+     GitHub Actions
+            |
+     AWS OIDC (no keys)
+            |
+      AWS Systems Manager
+            |
+           EC2
+            |
+   machine-readable evidence
+            |
+            v
+      GitHub artifacts
 ```
 
-This repository does not own application business logic, canonical knowledge, or workspace governance.
+SSH is not part of the normal automation path.
 
-## Operational principles
+## Safety levels
 
-1. Infrastructure should be reproducible where practical.
-2. Secrets must remain outside source control.
-3. Production-impacting changes require explicit validation.
-4. Environment-specific configuration should be identifiable.
-5. Operational assumptions should be documented.
-6. Infrastructure changes should remain traceable through Git history and Pull Requests.
+1. **READ** — identity, git state, service status, health, logs, database/schema checks.
+2. **WRITE** — approved synchronization/configuration/deployment operations.
+3. **RUNTIME** — restart/reload operations, explicitly selected by workflow input.
+4. **DESTRUCTIVE** — migrations, deletion, reset, destructive recovery. Never implicit.
 
-## Relationship to other repositories
+## Runtime-data rule
 
-- Applications remain in their product repositories.
-- Governance remains in `botri-governance`.
-- Workspace automation may be coordinated through `bwms-core` / `Botri-Command-Centre`.
-- Infrastructure-specific implementation belongs here.
+EC2 runtime data, including SQLite databases, logs, credentials, and generated artifacts, never belongs in Git.
 
 ## Status
 
-**Active infrastructure repository.**
-
-## Change guidance
-
-Before changing infrastructure, identify:
-
-- affected environment;
-- affected services;
-- rollback / recovery path;
-- secret/configuration dependencies;
-- validation required after deployment.
-
----
-
-**Dashboard maintenance rule:** keep this README aligned with the actual infrastructure providers, deployment mechanisms, environments, and operational automation in the repository.
+Foundation reset underway. The existing infrastructure repository is being replaced by this clean control-plane baseline through a reviewed PR. AWS account/IAM/SSM configuration remains an external environment step and is documented separately.
