@@ -9,7 +9,7 @@ on:
         default: production
         type: string
       target_repository:
-        description: GitHub repository directory name already checked out on EC2
+        description: Repository directory name already checked out on EC2
         required: true
         type: string
       target_ref:
@@ -18,7 +18,7 @@ on:
         default: main
         type: string
       application_path:
-        description: Absolute application path on EC2
+        description: Preferred application path on EC2; existing repo path is auto-discovered if absent
         required: true
         type: string
       runtime_action:
@@ -57,11 +57,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          case "$APPLICATION_PATH" in
-            /home/ubuntu/Botri-Workspace/*[!A-Za-z0-9._/-]*) echo 'Rejected: invalid application_path'; exit 2 ;;
-            /home/ubuntu/Botri-Workspace/*) ;;
-            *) echo 'Rejected: application_path must be under /home/ubuntu/Botri-Workspace'; exit 2 ;;
-          esac
           case "$TARGET_REPOSITORY" in
             ''|*[!A-Za-z0-9._-]*) echo 'Rejected: invalid target_repository'; exit 2 ;;
           esac
@@ -74,25 +69,29 @@ jobs:
           esac
 
           COMMANDS_JSON=$(jq -n \
-            --arg path "$APPLICATION_PATH" \
+            --arg preferred "$APPLICATION_PATH" \
             --arg ref "$TARGET_REF" \
             --arg action "$RUNTIME_ACTION" \
-            --arg app "$TARGET_REPOSITORY" \
+            --arg repo "$TARGET_REPOSITORY" \
             '{commands: [
               "set -u",
               "echo DEPLOY_BEGIN",
-              ("echo APPLICATION_PATH=" + $path),
-              ("echo TARGET_REF=" + $ref),
-              ("echo RUNTIME_ACTION=" + $action),
-              ("test -d " + ($path|@sh) + " || { echo APPLICATION_PATH_MISSING; exit 10; }"),
-              ("test -d " + (($path + "/.git")|@sh) + " || { echo GIT_DIRECTORY_MISSING; exit 11; }"),
-              ("git -C " + ($path|@sh) + " rev-parse --show-toplevel"),
-              ("git -C " + ($path|@sh) + " remote -v"),
-              ("GIT_TERMINAL_PROMPT=0 git -C " + ($path|@sh) + " fetch --prune origin"),
-              ("git -C " + ($path|@sh) + " checkout " + ($ref|@sh)),
-              ("git -C " + ($path|@sh) + " reset --ff-only origin/" + ($ref|@sh)),
-              ("echo DEPLOYED_COMMIT=$(git -C " + ($path|@sh) + " rev-parse HEAD)"),
-              ("if [ " + ($action|@sh) + " = restart ]; then pm2 restart " + ($app|@sh) + "; elif [ " + ($action|@sh) + " = reload ]; then pm2 reload " + ($app|@sh) + "; fi"),
+              ("PREFERRED_PATH=" + ($preferred|@sh)),
+              ("TARGET_REF=" + ($ref|@sh)),
+              ("RUNTIME_ACTION=" + ($action|@sh)),
+              ("TARGET_REPOSITORY=" + ($repo|@sh)),
+              "DEPLOY_PATH=",
+              "if [ -d \"$PREFERRED_PATH/.git\" ]; then DEPLOY_PATH=\"$PREFERRED_PATH\"; fi",
+              "if [ -z \"$DEPLOY_PATH\" ]; then while IFS= read -r gitdir; do candidate=${gitdir%/.git}; if git -C \"$candidate\" remote get-url origin 2>/dev/null | grep -qiE \"(^|[/:])${TARGET_REPOSITORY}([.]git)?$\"; then DEPLOY_PATH=\"$candidate\"; break; fi; done < <(find /home/ubuntu -type d -name .git -prune -print 2>/dev/null); fi",
+              "if [ -z \"$DEPLOY_PATH\" ]; then echo REPOSITORY_NOT_FOUND; echo DISCOVERY_CANDIDATES; find /home/ubuntu -maxdepth 5 -type d -name .git -prune -print 2>/dev/null | sed 's#/.git$##'; exit 20; fi",
+              "echo DEPLOY_PATH=$DEPLOY_PATH",
+              "git -C \"$DEPLOY_PATH\" rev-parse --show-toplevel",
+              "git -C \"$DEPLOY_PATH\" remote -v",
+              "GIT_TERMINAL_PROMPT=0 git -C \"$DEPLOY_PATH\" fetch --prune origin",
+              "git -C \"$DEPLOY_PATH\" checkout \"$TARGET_REF\"",
+              "git -C \"$DEPLOY_PATH\" reset --ff-only \"origin/$TARGET_REF\"",
+              "echo DEPLOYED_COMMIT=$(git -C \"$DEPLOY_PATH\" rev-parse HEAD)",
+              "if [ \"$RUNTIME_ACTION\" = restart ] || [ \"$RUNTIME_ACTION\" = reload ]; then PM2_APP=$(pm2 jlist 2>/dev/null | jq -r --arg n \"$TARGET_REPOSITORY\" '.[] | select((.name|ascii_downcase) == ($n|ascii_downcase)) | .name' | head -1); if [ -z \"$PM2_APP\" ]; then echo PM2_APP_NOT_FOUND; pm2 status; exit 21; fi; echo PM2_APP=$PM2_APP; if [ \"$RUNTIME_ACTION\" = restart ]; then pm2 restart \"$PM2_APP\"; else pm2 reload \"$PM2_APP\"; fi; fi",
               "pm2 status",
               "echo DEPLOYMENT_COMPLETE"
             ]}')
