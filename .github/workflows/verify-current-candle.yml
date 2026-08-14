@@ -33,10 +33,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          JS_B64='Y29uc3QgRGF0YWJhc2U9cmVxdWlyZSgnYmV0dGVyLXNxbGl0ZTMnKTtjb25zdCBkYj1uZXcgRGF0YWJhc2UoJ2RhdGEvY2FuZGxlcy9jYW5kbGVzLmRiJyx7cmVhZG9ubHk6dHJ1ZX0pO2NvbnN0IHI9ZGIucHJlcGFyZSgnU0VMRUNUIHN5bWJvbCxncmFudWxhcml0eSxvcGVuX3RpbWUsb3BlbixoaWdoLGxvdyxjbG9zZSx1cGRhdGVkX2F0IEZST00gbGl2ZV9jYW5kbGVzIFdIRVJFIHN5bWJvbD0/IEFORCBncmFudWxhcml0eT0/IE9SREVSIEJZIHVwZGF0ZWRfYXQgREVTQyBMSU1JVCAxJykuZ2V0KHByb2Nlc3MuZW52LkRFUklWX1NZTUJPTHx8JzFIWjEwMFYnLDYwKTtkYi5jbG9zZSgpO2lmKCFyKXRocm93IEVycm9yKCdMSVZFX0NBTkRMRV8wX05PVF9GT1VORCcpO2NvbnNvbGUubG9nKEpTT04uc3RyaW5naWZ5KHIpKTs='
+          JS_B64='Y29uc3QgRGF0YWJhc2U9cmVxdWlyZSgnYmV0dGVyLXNxbGl0ZTMnKTtjb25zdCBkYj1uZXcgRGF0YWJhc2UoJ2RhdGEvY2FuZGxlcy9jYW5kbGVzLmRiJyx7cmVhZG9ubHk6dHJ1ZX0pO2NvbnN0IHI9ZGIucHJlcGFyZSgnU0VMRUNUIHN5bWJvbCxncmFudWxhcml0eSxvcGVuX3RpbWUsb3BlbixoaWdoLGxvdyxjbG9zZSx1cGRhdGVkX2F0IEZST00gbGl2ZV9jYW5kbGVzIFdIRVJFIHN5bWJvbD0/IEFORCBncmFudWxhcml0eT0/IE9SREVSIEJZIHVwZGF0ZWRfYXQgREVTQyBMSU1JVCAxJykuZ2V0KHByb2Nlc3MuZW52LkRFUklWX1NZTUJPTCB8fCAnMUhaMTAwVicsNjApO2RiLmNsb3NlKCk7aWYoIXIpdGhyb3cgbmV3IEVycm9yKCdMSVZFX0NBTkRMRV8wX05PVF9GT1VORCcpO2NvbnNvbGUubG9nKEpTT04uc3RyaW5naWZ5KHIpKTs='
 
           REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
           set -euo pipefail
+          JS_B64="$1"
 
           PM2_CWD=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
             .[]
@@ -48,12 +49,7 @@ jobs:
             echo PM2_CWD_NOT_FOUND
             exit 30
           fi
-
           echo "PM2_CWD=$PM2_CWD"
-          if [ ! -d "$PM2_CWD" ]; then
-            echo PM2_CWD_MISSING
-            exit 31
-          fi
 
           DB_PATH="$PM2_CWD/data/candles/candles.db"
           if [ ! -f "$DB_PATH" ]; then
@@ -80,47 +76,34 @@ jobs:
           OPEN_TIME=$(printf '%s' "$ROW_JSON" | jq -r '.open_time')
           UPDATED_AT=$(printf '%s' "$ROW_JSON" | jq -r '.updated_at')
 
-          jq -n \
-            --arg symbol "$SYMBOL" \
-            --arg granularity "$GRANULARITY" \
-            --arg open "$OPEN" \
-            --arg high "$HIGH" \
-            --arg low "$LOW" \
-            --arg close "$CLOSE" \
-            --arg openTime "$OPEN_TIME" \
-            --arg updatedAt "$UPDATED_AT" \
-            '{symbol:$symbol,granularity:$granularity,open:$open,high:$high,low:$low,close:$close,open_time:$openTime,updated_at:$updatedAt}' > /tmp/candle-evidence.json
-
           if [ -z "${SIGNAL_BOT_TOKEN:-}" ] || [ -z "${SIGNAL_CHAT_ID:-}" ]; then
             echo TELEGRAM_RUNTIME_CONFIG_MISSING
             exit 33
           fi
 
-          MESSAGE=$(cat <<EOF
-          🕯️ BOTRI Current Candle-0
+          MESSAGE="🕯️ BOTRI Current Candle-0
 
-          Symbol: $SYMBOL
-          Timeframe: ${GRANULARITY}s
-          Open: $OPEN
-          High: $HIGH
-          Low: $LOW
-          Close: $CLOSE
-          Open Time: $OPEN_TIME
-          Updated At: $UPDATED_AT
-          State: LIVE Candle-0
-          EOF
-          )
+Symbol: $SYMBOL
+Timeframe: ${GRANULARITY}s
+Open: $OPEN
+High: $HIGH
+Low: $LOW
+Close: $CLOSE
+Open Time: $OPEN_TIME
+Updated At: $UPDATED_AT
+State: LIVE Candle-0"
 
-          RESPONSE=$(curl -fsS -X POST \
+          RESPONSE=$(curl --connect-timeout 5 --max-time 15 -fsS -X POST \
             "https://api.telegram.org/bot${SIGNAL_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${SIGNAL_CHAT_ID}" \
             --data-urlencode "text=${MESSAGE}")
 
-          echo "TELEGRAM_OK=$(printf '%s' "$RESPONSE" | jq -r '.ok // false')"
+          TELEGRAM_OK=$(printf '%s' "$RESPONSE" | jq -r '.ok // false')
           MESSAGE_ID=$(printf '%s' "$RESPONSE" | jq -r '.result.message_id // empty')
+          echo "TELEGRAM_OK=$TELEGRAM_OK"
           echo "TELEGRAM_MESSAGE_ID=$MESSAGE_ID"
 
-          if [ "$(printf '%s' "$RESPONSE" | jq -r '.ok // false')" != "true" ] || [ -z "$MESSAGE_ID" ]; then
+          if [ "$TELEGRAM_OK" != "true" ] || [ -z "$MESSAGE_ID" ]; then
             echo TELEGRAM_SEND_NOT_CONFIRMED
             exit 34
           fi
@@ -139,12 +122,12 @@ jobs:
           )
 
           SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
-          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" <<'PY'
+          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" "$JS_B64" <<'PY'
           import json
           import shlex
           import sys
-          script_b64 = sys.argv[1]
-          command = "printf '%s' " + shlex.quote(script_b64) + " | base64 -d | bash -s"
+          script_b64, js_b64 = sys.argv[1:]
+          command = "printf '%s' " + shlex.quote(script_b64) + " | base64 -d | bash -s -- " + shlex.quote(js_b64)
           print(json.dumps({"commands": [command]}))
           PY
           )
