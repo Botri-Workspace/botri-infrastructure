@@ -26,7 +26,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Deploy latest signal bot and verify Telegram E2E through SSM
+      - name: Diagnose runtime configuration and verify Telegram E2E through SSM
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
@@ -37,8 +37,6 @@ jobs:
           set -euo pipefail
 
           APP_PATH=/home/ubuntu/Botri-Workspace/botri-signals-bot
-          TARGET_REF=main
-          EXPECTED_REPOSITORY=botri-signals-bot
 
           if [ ! -d "$APP_PATH/.git" ]; then
             echo "REPOSITORY_NOT_FOUND=$APP_PATH"
@@ -46,62 +44,67 @@ jobs:
           fi
 
           sudo -u ubuntu -H git config --global --add safe.directory "$APP_PATH"
-          sudo -u ubuntu -H git -C "$APP_PATH" remote get-url origin
-          GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git -C "$APP_PATH" fetch --prune origin
-
-          EXPECTED_COMMIT=$(sudo -u ubuntu -H git -C "$APP_PATH" rev-parse "origin/$TARGET_REF^{commit}")
-          sudo -u ubuntu -H git -C "$APP_PATH" checkout "$TARGET_REF"
-          sudo -u ubuntu -H git -C "$APP_PATH" reset --hard "origin/$TARGET_REF"
+          sudo -u ubuntu -H git -C "$APP_PATH" fetch --prune origin
+          EXPECTED_COMMIT=$(sudo -u ubuntu -H git -C "$APP_PATH" rev-parse "origin/main^{commit}")
+          sudo -u ubuntu -H git -C "$APP_PATH" checkout main
+          sudo -u ubuntu -H git -C "$APP_PATH" reset --hard "origin/main"
           DEPLOYED_COMMIT=$(sudo -u ubuntu -H git -C "$APP_PATH" rev-parse HEAD)
 
           echo "EXPECTED_COMMIT=$EXPECTED_COMMIT"
           echo "DEPLOYED_COMMIT=$DEPLOYED_COMMIT"
-
-          if [ "$DEPLOYED_COMMIT" != "$EXPECTED_COMMIT" ]; then
-            echo "DEPLOYMENT_COMMIT_MISMATCH"
-            exit 24
-          fi
-
+          if [ "$DEPLOYED_COMMIT" != "$EXPECTED_COMMIT" ]; then exit 24; fi
           echo DEPLOYMENT_COMMIT_VERIFIED
 
-          PM2_APP=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
+          echo "APP_FILES:"
+          sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && find . -maxdepth 2 -type f -not -path './.git/*' -printf '%p\n' | sort"
+
+          echo "ENV_FILE_PRESENCE:"
+          for file in "$APP_PATH/.env" "$APP_PATH/.env.production" "$APP_PATH/.env.local"; do
+            if [ -f "$file" ]; then echo "PRESENT=$file"; else echo "ABSENT=$file"; fi
+          done
+
+          echo "ECOSYSTEM_CANDIDATES:"
+          find /home/ubuntu/Botri-Workspace -maxdepth 4 -type f \( -name 'ecosystem*.js' -o -name 'ecosystem*.cjs' -o -name 'ecosystem*.json' \) -print 2>/dev/null | sort || true
+
+          echo "PM2_RUNTIME_METADATA:"
+          sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
             .[]
             | select(.name | ascii_downcase | gsub("[^a-z0-9]"; "") == "botrisignalbot")
-            | .name
-          ' | head -1)
+            | {
+                name,
+                pm_cwd: .pm2_env.pm_cwd,
+                pm_exec_path: .pm2_env.pm_exec_path,
+                status: .pm2_env.status,
+                pid: .pid
+              }
+          '
 
-          if [ -z "$PM2_APP" ]; then
-            echo PM2_APP_NOT_FOUND
-            sudo -u ubuntu -H bash -lc 'pm2 status'
-            exit 22
-          fi
-
-          echo "PM2_APP=$PM2_APP"
-          sudo -u ubuntu -H bash -lc "pm2 restart $(printf '%q' "$PM2_APP")"
-          sleep 3
-
-          PM2_STATE=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r --arg app "$PM2_APP" '
+          PM2_PID=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
             .[]
-            | select(.name == $app)
-            | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring)]
-            | @tsv
+            | select(.name | ascii_downcase | gsub("[^a-z0-9]"; "") == "botrisignalbot")
+            | .pid
           ' | head -1)
 
-          PM2_STATUS=$(printf '%s' "$PM2_STATE" | cut -f1)
-          PM2_PID=$(printf '%s' "$PM2_STATE" | cut -f2)
-          echo "PM2_STATUS=$PM2_STATUS"
-          echo "PM2_PID=$PM2_PID"
-
-          if [ "$PM2_STATUS" != "online" ] || ! printf '%s' "$PM2_PID" | grep -Eq '^[1-9][0-9]*$'; then
-            echo PM2_RUNTIME_NOT_HEALTHY
-            sudo -u ubuntu -H bash -lc 'pm2 status'
-            exit 27
+          if [ -z "$PM2_PID" ] || [ "$PM2_PID" = "null" ] || [ "$PM2_PID" = "0" ]; then
+            echo PM2_PID_UNAVAILABLE
+            exit 26
           fi
 
-          echo PM2_RUNTIME_VERIFIED
+          echo "PM2_PROCESS_ENV_KEYS:"
+          sudo tr '\0' '\n' < "/proc/$PM2_PID/environ" \
+            | cut -d= -f1 \
+            | grep -E '^(DERIV_SYMBOL|SIGNAL_TIMEFRAME|MARKET_DATA_BASE_URL|MARKET_DATA_TIMEOUT_MS|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|TELEGRAM_TIMEOUT_MS)$' \
+            | sort \
+            | sed 's/$/=PRESENT/' || true
 
+          echo "PM2_LOG_TAIL:"
+          sudo -u ubuntu -H bash -lc 'pm2 logs Botri-Signal-Bot --lines 30 --nostream' || true
+
+          echo "DIRECT_CONFIG_CHECK:"
+          sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && node -e 'const {loadConfig}=require(\"./src/config\"); console.log(loadConfig())'"
+
+          echo "E2E_VERIFICATION_START"
           sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && node scripts/verify-current-candle.js"
-
           echo DEPLOYMENT_AND_TELEGRAM_E2E_COMPLETE
           REMOTE_SCRIPT
           )
