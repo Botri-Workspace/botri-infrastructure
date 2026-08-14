@@ -1,0 +1,143 @@
+name: Deploy canonical signal stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment containing AWS configuration
+        required: true
+        default: production
+        type: string
+      runtime_action:
+        description: PM2 action for both canonical runtimes
+        required: true
+        default: restart
+        type: choice
+        options:
+          - restart
+          - reload
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: canonical-signal-stack-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy market-data and signal runtimes through SSM
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          RUNTIME_ACTION: ${{ inputs.runtime_action }}
+        run: |
+          set -euo pipefail
+          REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          BASE=/home/ubuntu/Botri-Workspace
+          MARKET_DATA="$BASE/botri-market-data"
+          SIGNALS="$BASE/botri-signals-bot"
+          MARKET_DATA_DB="$MARKET_DATA/data/market-data.db"
+          RUNTIME_ACTION="$1"
+
+          bootstrap_repo() {
+            local repo="$1"; local target="$2"
+            local ssh_url="git@github.com:Botri-Workspace/${repo}.git"
+            local https_url="https://github.com/Botri-Workspace/${repo}.git"
+            if [ ! -d "$target/.git" ]; then
+              mkdir -p "$(dirname "$target")"
+              if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' sudo -u ubuntu -H git ls-remote "$ssh_url" HEAD >/dev/null 2>&1; then
+                sudo -u ubuntu -H git clone --branch main --single-branch "$ssh_url" "$target"; echo "BOOTSTRAP_${repo}=ssh"
+              elif GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git ls-remote "$https_url" HEAD >/dev/null 2>&1; then
+                sudo -u ubuntu -H git clone --branch main --single-branch "$https_url" "$target"; echo "BOOTSTRAP_${repo}=https"
+              elif command -v gh >/dev/null 2>&1 && sudo -u ubuntu -H gh auth status >/dev/null 2>&1; then
+                sudo -u ubuntu -H gh repo clone "Botri-Workspace/${repo}" "$target" -- --branch main --single-branch; echo "BOOTSTRAP_${repo}=gh"
+              else
+                echo "GITHUB_AUTH_UNAVAILABLE_${repo}"; exit 20
+              fi
+            fi
+            chown -R ubuntu:ubuntu "$target"
+            sudo -u ubuntu -H git config --global --add safe.directory "$target"
+            GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git -C "$target" fetch --prune origin
+            sudo -u ubuntu -H git -C "$target" checkout main
+            sudo -u ubuntu -H git -C "$target" reset --hard origin/main
+            echo "${repo}_COMMIT=$(sudo -u ubuntu -H git -C "$target" rev-parse HEAD)"
+          }
+
+          bootstrap_repo botri-market-data "$MARKET_DATA"
+          bootstrap_repo botri-signals-bot "$SIGNALS"
+          sudo -u ubuntu -H bash -lc "cd '$MARKET_DATA' && npm install --omit=dev"
+          sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && npm install --omit=dev"
+
+          sudo -u ubuntu -H bash -lc "cd '$MARKET_DATA' && pm2 startOrRestart ecosystem.config.js --update-env"
+          sleep 4
+          MARKET_STATE=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '.[] | select(.name == "botri-market-data") | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring), (.pm2_env.pm_cwd // "")] | @tsv' | head -1)
+          [ -n "$MARKET_STATE" ] || { echo MARKET_DATA_PM2_ENTRY_MISSING; exit 30; }
+          MARKET_STATUS=$(printf '%s' "$MARKET_STATE" | cut -f1)
+          MARKET_PID=$(printf '%s' "$MARKET_STATE" | cut -f2)
+          MARKET_CWD=$(printf '%s' "$MARKET_STATE" | cut -f3)
+          echo "MARKET_DATA_STATUS=$MARKET_STATUS"; echo "MARKET_DATA_PID=$MARKET_PID"; echo "MARKET_DATA_CWD=$MARKET_CWD"
+          if [ "$MARKET_STATUS" != online ] || ! printf '%s' "$MARKET_PID" | grep -Eq '^[1-9][0-9]*$' || [ "$MARKET_CWD" != "$MARKET_DATA" ]; then echo MARKET_DATA_RUNTIME_NOT_HEALTHY; sudo -u ubuntu -H bash -lc 'pm2 status'; exit 31; fi
+
+          sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && grep -q '^TELEGRAM_BOT_TOKEN=' .env && grep -q '^TELEGRAM_CHAT_ID=' .env"
+          sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && BOTRI_MARKET_DATA_ROOT='$MARKET_DATA' BOTRI_MARKET_DATA_DB='$MARKET_DATA_DB' pm2 startOrRestart ecosystem.config.js --update-env"
+          sleep 4
+          SIGNAL_STATE=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '.[] | select(.name == "botri-signals-bot") | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring), (.pm2_env.pm_cwd // "")] | @tsv' | head -1)
+          [ -n "$SIGNAL_STATE" ] || { echo SIGNAL_PM2_ENTRY_MISSING; exit 32; }
+          SIGNAL_STATUS=$(printf '%s' "$SIGNAL_STATE" | cut -f1)
+          SIGNAL_PID=$(printf '%s' "$SIGNAL_STATE" | cut -f2)
+          SIGNAL_CWD=$(printf '%s' "$SIGNAL_STATE" | cut -f3)
+          echo "SIGNAL_STATUS=$SIGNAL_STATUS"; echo "SIGNAL_PID=$SIGNAL_PID"; echo "SIGNAL_CWD=$SIGNAL_CWD"
+          if [ "$SIGNAL_STATUS" != online ] || ! printf '%s' "$SIGNAL_PID" | grep -Eq '^[1-9][0-9]*$' || [ "$SIGNAL_CWD" != "$SIGNALS" ]; then echo SIGNAL_RUNTIME_NOT_HEALTHY; sudo -u ubuntu -H bash -lc 'pm2 status'; exit 33; fi
+
+          timeout 30s sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && BOTRI_MARKET_DATA_ROOT='$MARKET_DATA' BOTRI_MARKET_DATA_DB='$MARKET_DATA_DB' npm run verify:current-candle"
+          sudo -u ubuntu -H bash -lc 'pm2 save'
+          echo CANONICAL_MARKET_DATA_RUNTIME=botri-market-data
+          echo CANONICAL_SIGNAL_RUNTIME=botri-signals-bot
+          echo MARKET_DATA_SOURCE=DERIV
+          echo SIGNAL_CANDLE_SOURCE=BOTRI_MARKET_DATA
+          echo IQBINARY_PROCESS_INVOLVEMENT=NONE
+          echo CANONICAL_TELEGRAM_E2E=PASS
+          sudo -u ubuntu -H bash -lc 'pm2 status'
+          REMOTE_SCRIPT
+          )
+
+          SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
+          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" "$RUNTIME_ACTION" <<'PY'
+          import json, shlex, sys
+          script_b64, action = sys.argv[1:]
+          command = "printf '%s' " + shlex.quote(script_b64) + " | base64 -d | bash -s -- " + shlex.quote(action)
+          print(json.dumps({"commands": [command]}))
+          PY
+          )
+          COMMAND_ID=$(aws ssm send-command --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment "canonical market-data and signal runtime deployment" --parameters "$COMMANDS_JSON" --query 'Command.CommandId' --output text)
+          echo "SSM_COMMAND_ID=$COMMAND_ID"
+          set +e
+          aws ssm wait command-executed --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"; WAIT_EXIT=$?
+          set -e
+          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" | tee deployment-result.json
+          STATUS=$(jq -r '.Status // "Unknown"' deployment-result.json)
+          RESPONSE_CODE=$(jq -r '.ResponseCode // -1' deployment-result.json)
+          STDOUT=$(jq -r '.StandardOutputContent // ""' deployment-result.json)
+          STDERR=$(jq -r '.StandardErrorContent // ""' deployment-result.json)
+          printf '%s\n' "$STDOUT"; printf '%s\n' "$STDERR" >&2
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != Success ] || [ "$RESPONSE_CODE" -ne 0 ] || ! printf '%s\n' "$STDOUT" | grep -q '^CANONICAL_TELEGRAM_E2E=PASS$'; then echo "Canonical signal stack deployment failed: status=$STATUS response_code=$RESPONSE_CODE"; exit 1; fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: canonical-signal-stack-${{ github.run_id }}
+          path: deployment-result.json
+          if-no-files-found: warn
