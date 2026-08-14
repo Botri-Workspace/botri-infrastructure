@@ -73,7 +73,8 @@ jobs:
           esac
 
           REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
-          set -u
+          set -euo pipefail
+
           PREFERRED_PATH="$1"
           TARGET_REF="$2"
           RUNTIME_ACTION="$3"
@@ -134,16 +135,35 @@ jobs:
           fi
 
           chown -R ubuntu:ubuntu "$DEPLOY_PATH"
-          git config --global --add safe.directory "$DEPLOY_PATH" || true
+          sudo -u ubuntu -H git config --global --add safe.directory "$DEPLOY_PATH"
 
           echo "DEPLOY_PATH=$DEPLOY_PATH"
-          git -C "$DEPLOY_PATH" rev-parse --show-toplevel
-          git -C "$DEPLOY_PATH" remote -v
+          sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse --show-toplevel
+          sudo -u ubuntu -H git -C "$DEPLOY_PATH" remote -v
+
           GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git -C "$DEPLOY_PATH" fetch --prune origin
+
+          EXPECTED_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse "origin/$TARGET_REF^{commit}")
+          echo "EXPECTED_COMMIT=$EXPECTED_COMMIT"
+
           sudo -u ubuntu -H git -C "$DEPLOY_PATH" checkout "$TARGET_REF"
-          sudo -u ubuntu -H git -C "$DEPLOY_PATH" reset --ff-only "origin/$TARGET_REF"
+          sudo -u ubuntu -H git -C "$DEPLOY_PATH" reset --hard "origin/$TARGET_REF"
+
           DEPLOYED_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse HEAD)
           echo "DEPLOYED_COMMIT=$DEPLOYED_COMMIT"
+
+          if [ "$DEPLOYED_COMMIT" != "$EXPECTED_COMMIT" ]; then
+            echo "DEPLOYMENT_COMMIT_MISMATCH expected=$EXPECTED_COMMIT deployed=$DEPLOYED_COMMIT"
+            exit 24
+          fi
+
+          ORIGIN_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse "origin/$TARGET_REF^{commit}")
+          if [ "$DEPLOYED_COMMIT" != "$ORIGIN_COMMIT" ]; then
+            echo "DEPLOYMENT_ORIGIN_MISMATCH origin=$ORIGIN_COMMIT deployed=$DEPLOYED_COMMIT"
+            exit 25
+          fi
+
+          echo DEPLOYMENT_COMMIT_VERIFIED
 
           if [ "$RUNTIME_ACTION" = restart ] || [ "$RUNTIME_ACTION" = reload ]; then
             PM2_USER=""
@@ -184,11 +204,40 @@ jobs:
             else
               sudo -u "$PM2_USER" -H bash -lc "pm2 reload $(printf '%q' "$PM2_APP")"
             fi
+
+            sleep 2
+
+            PM2_STATE=$(sudo -u "$PM2_USER" -H bash -lc 'pm2 jlist' | jq -r --arg app "$PM2_APP" '
+              .[]
+              | select(.name == $app)
+              | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring)]
+              | @tsv
+            ' | head -1)
+
+            if [ -z "$PM2_STATE" ]; then
+              echo PM2_RUNTIME_ENTRY_NOT_FOUND
+              sudo -u "$PM2_USER" -H bash -lc 'pm2 status'
+              exit 26
+            fi
+
+            PM2_STATUS=$(printf '%s' "$PM2_STATE" | cut -f1)
+            PM2_PID=$(printf '%s' "$PM2_STATE" | cut -f2)
+            echo "PM2_STATUS=$PM2_STATUS"
+            echo "PM2_PID=$PM2_PID"
+
+            if [ "$PM2_STATUS" != "online" ] || ! printf '%s' "$PM2_PID" | grep -Eq '^[1-9][0-9]*$'; then
+              echo "PM2_RUNTIME_NOT_HEALTHY status=$PM2_STATUS pid=$PM2_PID"
+              sudo -u "$PM2_USER" -H bash -lc 'pm2 status'
+              exit 27
+            fi
+
+            echo PM2_RUNTIME_VERIFIED
           fi
 
           if id ubuntu >/dev/null 2>&1; then
             sudo -u ubuntu -H bash -lc 'pm2 status' || true
           fi
+
           echo DEPLOYMENT_COMPLETE
           REMOTE_SCRIPT
           )
@@ -235,6 +284,7 @@ jobs:
 
           COMMAND_STATUS=$(jq -r '.Status // "Unknown"' deployment-result.json)
           COMMAND_STATUS_DETAILS=$(jq -r '.StatusDetails // "Unknown"' deployment-result.json)
+          COMMAND_RESPONSE_CODE=$(jq -r '.ResponseCode // -1' deployment-result.json)
           COMMAND_STDOUT=$(jq -r '.StandardOutputContent // ""' deployment-result.json)
           COMMAND_STDERR=$(jq -r '.StandardErrorContent // ""' deployment-result.json)
 
@@ -242,16 +292,9 @@ jobs:
           printf '%s\n' "$COMMAND_STDERR" >&2
           echo "SSM_STATUS=$COMMAND_STATUS"
           echo "SSM_STATUS_DETAILS=$COMMAND_STATUS_DETAILS"
+          echo "SSM_RESPONSE_CODE=$COMMAND_RESPONSE_CODE"
 
-          if [ "$WAIT_EXIT" -ne 0 ] || [ "$COMMAND_STATUS" != "Success" ]; then
-            echo "SSM deployment failed: status=$COMMAND_STATUS status_details=$COMMAND_STATUS_DETAILS"
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$COMMAND_STATUS" != "Success" ] || [ "$COMMAND_RESPONSE_CODE" -ne 0 ]; then
+            echo "SSM deployment failed: status=$COMMAND_STATUS status_details=$COMMAND_STATUS_DETAILS response_code=$COMMAND_RESPONSE_CODE"
             exit 1
           fi
-
-      - name: Upload evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ec2-deployment-${{ github.run_id }}
-          path: deployment-result.json
-          if-no-files-found: warn
