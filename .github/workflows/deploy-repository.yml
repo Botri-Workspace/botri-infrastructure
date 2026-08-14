@@ -9,7 +9,7 @@ on:
         default: production
         type: string
       target_repository:
-        description: Repository directory name already checked out on EC2
+        description: Repository directory name to deploy on EC2
         required: true
         type: string
       target_ref:
@@ -18,7 +18,7 @@ on:
         default: main
         type: string
       application_path:
-        description: Preferred application path on EC2; existing repo path is auto-discovered if absent
+        description: Preferred application path on EC2; missing repositories are bootstrapped there
         required: true
         type: string
       runtime_action:
@@ -67,6 +67,10 @@ jobs:
             none|restart|reload) ;;
             *) echo 'Rejected: invalid runtime_action'; exit 2 ;;
           esac
+          case "$APPLICATION_PATH" in
+            /home/ubuntu/Botri-Workspace/*) ;;
+            *) echo 'Rejected: application_path must be under /home/ubuntu/Botri-Workspace'; exit 2 ;;
+          esac
 
           REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
           set -u
@@ -75,6 +79,9 @@ jobs:
           RUNTIME_ACTION="$3"
           TARGET_REPOSITORY="$4"
           DEPLOY_PATH=""
+          BOOTSTRAP_PATH="$PREFERRED_PATH"
+          REPO_SSH="git@github.com:Botri-Workspace/${TARGET_REPOSITORY}.git"
+          REPO_HTTPS="https://github.com/Botri-Workspace/${TARGET_REPOSITORY}.git"
 
           echo DEPLOY_BEGIN
           echo "PREFERRED_PATH=$PREFERRED_PATH"
@@ -98,10 +105,27 @@ jobs:
           fi
 
           if [ -z "$DEPLOY_PATH" ]; then
-            echo REPOSITORY_NOT_FOUND
-            echo DISCOVERY_CANDIDATES
-            find /home/ubuntu -maxdepth 6 -type d -name .git -prune -print 2>/dev/null | sed 's#/.git$##'
-            exit 20
+            echo REPOSITORY_MISSING_BOOTSTRAP_REQUIRED
+            mkdir -p "$(dirname "$BOOTSTRAP_PATH")"
+
+            if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' git ls-remote "$REPO_SSH" HEAD >/dev/null 2>&1; then
+              echo BOOTSTRAP_AUTH=ssh
+              git clone --branch "$TARGET_REF" --single-branch "$REPO_SSH" "$BOOTSTRAP_PATH"
+              DEPLOY_PATH="$BOOTSTRAP_PATH"
+            elif GIT_TERMINAL_PROMPT=0 git ls-remote "$REPO_HTTPS" HEAD >/dev/null 2>&1; then
+              echo BOOTSTRAP_AUTH=https-credential-helper
+              git clone --branch "$TARGET_REF" --single-branch "$REPO_HTTPS" "$BOOTSTRAP_PATH"
+              DEPLOY_PATH="$BOOTSTRAP_PATH"
+            elif command -v gh >/dev/null 2>&1 && sudo -u ubuntu -H gh auth status >/dev/null 2>&1; then
+              echo BOOTSTRAP_AUTH=gh
+              sudo -u ubuntu -H gh repo clone "Botri-Workspace/${TARGET_REPOSITORY}" "$BOOTSTRAP_PATH" -- --branch "$TARGET_REF" --single-branch
+              DEPLOY_PATH="$BOOTSTRAP_PATH"
+            else
+              echo GITHUB_AUTH_UNAVAILABLE
+              echo 'No usable existing SSH, HTTPS credential-helper, or gh authentication was found on EC2.'
+              echo 'No credential or token was printed.'
+              exit 20
+            fi
           fi
 
           echo "DEPLOY_PATH=$DEPLOY_PATH"
