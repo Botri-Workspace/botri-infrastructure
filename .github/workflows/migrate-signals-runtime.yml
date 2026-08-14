@@ -8,6 +8,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: canonical-signals-runtime-migration
+  cancel-in-progress: true
+
 jobs:
   migrate:
     runs-on: ubuntu-latest
@@ -137,7 +141,7 @@ jobs:
           echo IQBINARY_PROCESS_INVOLVEMENT=NONE
           echo MIGRATION_COMPLETE
 
-          sudo -u ubuntu -H bash -lc "cd '$TARGET' && node scripts/verify-current-candle.js"
+          timeout 30s sudo -u ubuntu -H bash -lc "cd '$TARGET' && node scripts/verify-current-candle.js"
           echo CANONICAL_TELEGRAM_E2E=PASS
           sudo -u ubuntu -H bash -lc 'pm2 status'
           REMOTE_SCRIPT
