@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           COMMAND_IDS=$(aws ssm list-commands \
             --region "$AWS_REGION" \
-            --filters Key=Status,Values=InProgress \
+            --filters key=Status,value=InProgress \
             --query 'Commands[?contains(Comment, `canonical signals runtime migration`)].CommandId' \
             --output text)
           for command_id in $COMMAND_IDS; do
