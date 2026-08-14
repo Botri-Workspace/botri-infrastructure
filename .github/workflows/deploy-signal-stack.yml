@@ -102,6 +102,36 @@ jobs:
           if [ "$SIGNAL_STATUS" != online ] || ! printf '%s' "$SIGNAL_PID" | grep -Eq '^[1-9][0-9]*$' || [ "$SIGNAL_CWD" != "$SIGNALS" ]; then echo SIGNAL_RUNTIME_NOT_HEALTHY; sudo -u ubuntu -H bash -lc 'pm2 status'; exit 33; fi
 
           timeout 30s sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && BOTRI_MARKET_DATA_ROOT='$MARKET_DATA' BOTRI_MARKET_DATA_DB='$MARKET_DATA_DB' npm run verify:current-candle"
+
+          SIGNAL_LOG=""
+          SIGNAL_LOG=$(timeout 75s bash -c '
+            while true; do
+              LOG=$(sudo -u ubuntu -H bash -lc "pm2 logs botri-signals-bot --lines 200 --nostream 2>&1" || true)
+              if printf "%s\n" "$LOG" | grep -Eq "Telegram candle\+signal sent .* message_id=[1-9][0-9]*"; then
+                printf "%s\n" "$LOG"
+                exit 0
+              fi
+              sleep 5
+            done
+          ')
+          printf '%s\n' "$SIGNAL_LOG"
+          SIGNAL_LINE=$(printf '%s\n' "$SIGNAL_LOG" | grep -E "Telegram candle\+signal sent .* message_id=[1-9][0-9]*" | tail -1)
+          printf 'SIGNAL_DELIVERY=%s\n' "$SIGNAL_LINE"
+          LEAD_SEC=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*lead_sec=\([0-9.]*\).*/\1/p')
+          SIGNAL_STATE_VALUE=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*signal=\([^ ]*\).*/\1/p')
+          SIGNAL_MESSAGE_ID=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*message_id=\([0-9]*\).*/\1/p')
+          python3 - "$LEAD_SEC" <<'PY'
+          import sys
+          lead = float(sys.argv[1])
+          if not 2.0 <= lead <= 4.0:
+              raise SystemExit(f"SIGNAL_LEAD_OUT_OF_RANGE={lead}")
+          PY
+          [ -n "$SIGNAL_STATE_VALUE" ] || { echo SIGNAL_DECISION_MISSING; exit 34; }
+          [ -n "$SIGNAL_MESSAGE_ID" ] || { echo SIGNAL_MESSAGE_ID_MISSING; exit 35; }
+          echo "SIGNAL_LEAD_SEC=$LEAD_SEC"
+          echo "SIGNAL_DECISION=$SIGNAL_STATE_VALUE"
+          echo "SIGNAL_TELEGRAM_MESSAGE_ID=$SIGNAL_MESSAGE_ID"
+
           sudo -u ubuntu -H bash -lc 'pm2 save'
           echo CANONICAL_MARKET_DATA_RUNTIME=botri-market-data
           echo CANONICAL_SIGNAL_RUNTIME=botri-signals-bot
@@ -109,6 +139,7 @@ jobs:
           echo SIGNAL_CANDLE_SOURCE=BOTRI_MARKET_DATA
           echo IQBINARY_PROCESS_INVOLVEMENT=NONE
           echo CANONICAL_TELEGRAM_E2E=PASS
+          echo CANONICAL_SIGNAL_T3_E2E=PASS
           sudo -u ubuntu -H bash -lc 'pm2 status'
           REMOTE_SCRIPT
           )
@@ -132,7 +163,7 @@ jobs:
           STDOUT=$(jq -r '.StandardOutputContent // ""' deployment-result.json)
           STDERR=$(jq -r '.StandardErrorContent // ""' deployment-result.json)
           printf '%s\n' "$STDOUT"; printf '%s\n' "$STDERR" >&2
-          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != Success ] || [ "$RESPONSE_CODE" -ne 0 ] || ! printf '%s\n' "$STDOUT" | grep -q '^CANONICAL_TELEGRAM_E2E=PASS$'; then echo "Canonical signal stack deployment failed: status=$STATUS response_code=$RESPONSE_CODE"; exit 1; fi
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != Success ] || [ "$RESPONSE_CODE" -ne 0 ] || ! printf '%s\n' "$STDOUT" | grep -q '^CANONICAL_SIGNAL_T3_E2E=PASS$'; then echo "Canonical signal stack deployment failed: status=$STATUS response_code=$RESPONSE_CODE"; exit 1; fi
 
       - name: Upload evidence
         if: always()
