@@ -16,6 +16,17 @@ on:
         options:
           - restart
           - reload
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        type: string
+        default: production
+      runtime_action:
+        required: false
+        type: string
+        default: restart
+    secrets: {}
 
 permissions:
   id-token: write
