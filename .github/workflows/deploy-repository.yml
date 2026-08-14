@@ -55,6 +55,7 @@ jobs:
           RUNTIME_ACTION: ${{ inputs.runtime_action }}
         run: |
           set -euo pipefail
+
           case "$APPLICATION_PATH" in
             /home/ubuntu/Botri-Workspace/*[!A-Za-z0-9._/-]*) echo 'Rejected: invalid application_path'; exit 2 ;;
             /home/ubuntu/Botri-Workspace/*) ;;
@@ -72,18 +73,31 @@ jobs:
           esac
 
           COMMANDS_JSON=$(jq -n \
-            --arg c1 "set -euo pipefail" \
-            --arg c2 "test -d $APPLICATION_PATH/.git" \
-            --arg c3 "git -C $APPLICATION_PATH fetch --prune origin" \
-            --arg c4 "git -C $APPLICATION_PATH checkout $TARGET_REF" \
-            --arg c5 "git -C $APPLICATION_PATH reset --ff-only origin/$TARGET_REF" \
-            --arg c6 "if [ $RUNTIME_ACTION = restart ]; then pm2 restart $TARGET_REPOSITORY; elif [ $RUNTIME_ACTION = reload ]; then pm2 reload $TARGET_REPOSITORY; fi" \
-            --arg c7 "echo DEPLOYMENT_COMPLETE" \
-            --arg c8 "git -C $APPLICATION_PATH rev-parse HEAD" \
-            --arg c9 "pm2 status" \
-            '{commands: [$c1,$c2,$c3,$c4,$c5,$c6,$c7,$c8,$c9]}')
+            --arg path "$APPLICATION_PATH" \
+            --arg ref "$TARGET_REF" \
+            --arg action "$RUNTIME_ACTION" \
+            --arg app "$TARGET_REPOSITORY" \
+            '{commands: [
+              "set -u",
+              ("echo DEPLOY_BEGIN"),
+              ("echo APPLICATION_PATH=" + $path),
+              ("echo TARGET_REF=" + $ref),
+              ("echo RUNTIME_ACTION=" + $action),
+              ("test -d " + ($path|@sh) + " || { echo APPLICATION_PATH_MISSING; exit 10; }"),
+              ("test -d " + (($path + "/.git")|@sh) + " || { echo GIT_DIRECTORY_MISSING; exit 11; }"),
+              ("git -C " + ($path|@sh) + " rev-parse --show-toplevel"),
+              ("git -C " + ($path|@sh) + " remote -v"),
+              ("GIT_TERMINAL_PROMPT=0 git -C " + ($path|@sh) + " fetch --prune origin"),
+              ("git -C " + ($path|@sh) + " checkout " + ($ref|@sh)),
+              ("git -C " + ($path|@sh) + " reset --ff-only origin/" + ($ref|@sh)),
+              ("echo DEPLOYED_COMMIT=$(git -C " + ($path|@sh) + " rev-parse HEAD)"),
+              ("if [ " + ($action|@sh) + " = restart ]; then pm2 restart " + ($app|@sh) + "; elif [ " + ($action|@sh) + " = reload ]; then pm2 reload " + ($app|@sh) + "; fi"),
+              "pm2 status",
+              "echo DEPLOYMENT_COMPLETE"
+            ]}')
 
           COMMAND_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "botri-infrastructure deployment ${TARGET_REPOSITORY}@${TARGET_REF}" \
@@ -93,17 +107,25 @@ jobs:
           echo "SSM_COMMAND_ID=$COMMAND_ID"
 
           set +e
-          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+          aws ssm wait command-executed \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID"
           WAIT_EXIT=$?
           set -e
 
           aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" | tee deployment-result.json
 
           COMMAND_STATUS=$(jq -r '.Status // "Unknown"' deployment-result.json)
           COMMAND_STATUS_DETAILS=$(jq -r '.StatusDetails // "Unknown"' deployment-result.json)
+          COMMAND_STDOUT=$(jq -r '.StandardOutputContent // ""' deployment-result.json)
+          COMMAND_STDERR=$(jq -r '.StandardErrorContent // ""' deployment-result.json)
 
+          printf '%s\n' "$COMMAND_STDOUT"
+          printf '%s\n' "$COMMAND_STDERR" >&2
           echo "SSM_STATUS=$COMMAND_STATUS"
           echo "SSM_STATUS_DETAILS=$COMMAND_STATUS_DETAILS"
 
