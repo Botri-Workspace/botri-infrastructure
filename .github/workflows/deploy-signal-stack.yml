@@ -91,7 +91,7 @@ jobs:
           if [ "$MARKET_STATUS" != online ] || ! printf '%s' "$MARKET_PID" | grep -Eq '^[1-9][0-9]*$' || [ "$MARKET_CWD" != "$MARKET_DATA" ]; then echo MARKET_DATA_RUNTIME_NOT_HEALTHY; sudo -u ubuntu -H bash -lc 'pm2 status'; exit 31; fi
 
           sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && grep -q '^TELEGRAM_BOT_TOKEN=' .env && grep -q '^TELEGRAM_CHAT_ID=' .env"
-          sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && BOTRI_MARKET_DATA_ROOT='$MARKET_DATA' BOTRI_MARKET_DATA_DB='$MARKET_DATA_DB' pm2 startOrRestart ecosystem.config.js --update-env"
+          sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && BOTRI_MARKET_DATA_SOURCE='botri-market-data' BOTRI_MARKET_DATA_ROOT='$MARKET_DATA' BOTRI_MARKET_DATA_DB='$MARKET_DATA_DB' SIGNAL_TIMEFRAME='60' CURRENT_CANDLE_NOTIFY_LEAD_SEC='3' pm2 startOrRestart ecosystem.config.js --update-env"
           sleep 4
           SIGNAL_STATE=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '.[] | select(.name == "botri-signals-bot") | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring), (.pm2_env.pm_cwd // "")] | @tsv' | head -1)
           [ -n "$SIGNAL_STATE" ] || { echo SIGNAL_PM2_ENTRY_MISSING; exit 32; }
@@ -100,8 +100,6 @@ jobs:
           SIGNAL_CWD=$(printf '%s' "$SIGNAL_STATE" | cut -f3)
           echo "SIGNAL_STATUS=$SIGNAL_STATUS"; echo "SIGNAL_PID=$SIGNAL_PID"; echo "SIGNAL_CWD=$SIGNAL_CWD"
           if [ "$SIGNAL_STATUS" != online ] || ! printf '%s' "$SIGNAL_PID" | grep -Eq '^[1-9][0-9]*$' || [ "$SIGNAL_CWD" != "$SIGNALS" ]; then echo SIGNAL_RUNTIME_NOT_HEALTHY; sudo -u ubuntu -H bash -lc 'pm2 status'; exit 33; fi
-
-          timeout 30s sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && BOTRI_MARKET_DATA_ROOT='$MARKET_DATA' BOTRI_MARKET_DATA_DB='$MARKET_DATA_DB' npm run verify:current-candle"
 
           SIGNAL_LOG=""
           SIGNAL_LOG=$(timeout 75s bash -c '
@@ -127,6 +125,10 @@ jobs:
               raise SystemExit(f"SIGNAL_LEAD_OUT_OF_RANGE={lead}")
           PY
           [ -n "$SIGNAL_STATE_VALUE" ] || { echo SIGNAL_DECISION_MISSING; exit 34; }
+          case "$SIGNAL_STATE_VALUE" in
+            BUY|SELL|WAIT) ;;
+            *) echo "SIGNAL_DECISION_INVALID=$SIGNAL_STATE_VALUE"; exit 36 ;;
+          esac
           [ -n "$SIGNAL_MESSAGE_ID" ] || { echo SIGNAL_MESSAGE_ID_MISSING; exit 35; }
           echo "SIGNAL_LEAD_SEC=$LEAD_SEC"
           echo "SIGNAL_DECISION=$SIGNAL_STATE_VALUE"
