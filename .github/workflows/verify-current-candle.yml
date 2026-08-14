@@ -1,0 +1,183 @@
+name: Telegram Current Candle E2E Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-current-candle.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: telegram-current-candle-e2e
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Execute live candle + Telegram verification through SSM
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+
+          REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          APP_PATH=/home/ubuntu/Botri-Workspace/botri-signals-bot
+          APP_USER=ubuntu
+
+          if [ ! -d "$APP_PATH/.git" ]; then
+            echo "REPOSITORY_NOT_FOUND=$APP_PATH"
+            exit 20
+          fi
+
+          sudo -u "$APP_USER" -H bash -lc '
+            set -euo pipefail
+            cd /home/ubuntu/Botri-Workspace/botri-signals-bot
+
+            node <<'NODE'
+            const { loadConfig } = require("./src/config");
+            const { MarketDataClient } = require("./src/marketDataClient");
+            const { TelegramClient } = require("./src/telegramClient");
+            const { formatCurrentCandleMessage } = require("./src/telegram/currentCandleMessage");
+
+            (async () => {
+              const config = loadConfig();
+              const marketDataClient = new MarketDataClient({
+                baseUrl: config.marketDataBaseUrl,
+                timeoutMs: config.marketDataTimeoutMs
+              });
+              const telegramClient = new TelegramClient({
+                token: config.telegramBotToken,
+                chatId: config.telegramChatId,
+                timeoutMs: config.telegramTimeoutMs
+              });
+
+              const payload = await marketDataClient.getSeries({
+                symbol: config.symbol,
+                granularity: config.granularity,
+                limit: 1,
+                includeLive: true
+              });
+
+              const candle = payload && payload.live;
+              if (!candle) throw new Error("LIVE_CANDLE_0_UNAVAILABLE");
+
+              const values = ["open", "high", "low", "close"].map((field) => Number(candle[field]));
+              if (!values.every(Number.isFinite)) throw new Error("LIVE_CANDLE_OHLC_INVALID");
+
+              const [open, high, low, close] = values;
+              if (high < Math.max(open, close)) throw new Error("LIVE_CANDLE_HIGH_INCONSISTENT");
+              if (low > Math.min(open, close)) throw new Error("LIVE_CANDLE_LOW_INCONSISTENT");
+
+              const message = formatCurrentCandleMessage({
+                symbol: config.symbol,
+                granularity: config.granularity,
+                candle
+              });
+
+              const telegramResponse = await telegramClient.sendMessage(message);
+              if (!telegramResponse || telegramResponse.ok !== true) {
+                throw new Error("TELEGRAM_SEND_NOT_CONFIRMED");
+              }
+              if (!telegramResponse.result || !telegramResponse.result.message_id) {
+                throw new Error("TELEGRAM_MESSAGE_ID_MISSING");
+              }
+
+              const sentText = telegramResponse.result.text || "";
+              if (!sentText.includes("BOTRI Current Candle")) throw new Error("TELEGRAM_TEXT_MISMATCH");
+              if (!sentText.includes(`State: LIVE Candle-0`)) throw new Error("TELEGRAM_STATE_MISMATCH");
+              for (const [field, value] of [["Open", open], ["High", high], ["Low", low], ["Close", close]]) {
+                if (!sentText.includes(`${field}: ${value}`)) throw new Error(`TELEGRAM_${field.toUpperCase()}_MISMATCH`);
+              }
+
+              console.log("E2E_VERIFICATION=PASS");
+              console.log(`SYMBOL=${config.symbol}`);
+              console.log(`GRANULARITY=${config.granularity}`);
+              console.log(`OPEN=${open}`);
+              console.log(`HIGH=${high}`);
+              console.log(`LOW=${low}`);
+              console.log(`CLOSE=${close}`);
+              console.log(`OPEN_TIME=${candle.open_time ?? "N/A"}`);
+              console.log(`UPDATED_AT=${candle.updated_at ?? "N/A"}`);
+              console.log(`TELEGRAM_MESSAGE_ID=${telegramResponse.result.message_id}`);
+              console.log("TELEGRAM_TEXT_VERIFIED=true");
+            })().catch((error) => {
+              console.error(`E2E_VERIFICATION=FAIL`);
+              console.error(error.stack || error.message);
+              process.exit(1);
+            });
+            NODE
+          '
+          REMOTE_SCRIPT
+          )
+
+          SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
+          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" <<'PY'
+          import json
+          import shlex
+          import sys
+          script_b64 = sys.argv[1]
+          command = "printf '%s' " + shlex.quote(script_b64) + " | base64 -d | bash -s"
+          print(json.dumps({"commands": [command]}))
+          PY
+          )
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "botri-infrastructure Telegram current candle E2E verification" \
+            --parameters "$COMMANDS_JSON" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM_COMMAND_ID=$COMMAND_ID"
+
+          set +e
+          aws ssm wait command-executed \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID"
+          WAIT_EXIT=$?
+          set -e
+
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --output json | tee telegram-current-candle-e2e.json
+
+          STATUS=$(jq -r '.Status // "Unknown"' telegram-current-candle-e2e.json)
+          RESPONSE_CODE=$(jq -r '.ResponseCode // -1' telegram-current-candle-e2e.json)
+          STDOUT=$(jq -r '.StandardOutputContent // ""' telegram-current-candle-e2e.json)
+          STDERR=$(jq -r '.StandardErrorContent // ""' telegram-current-candle-e2e.json)
+
+          printf '%s\n' "$STDOUT"
+          printf '%s\n' "$STDERR" >&2
+
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != "Success" ] || [ "$RESPONSE_CODE" -ne 0 ] || ! printf '%s\n' "$STDOUT" | grep -q '^E2E_VERIFICATION=PASS$'; then
+            echo "E2E verification failed: status=$STATUS response_code=$RESPONSE_CODE"
+            exit 1
+          fi
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: telegram-current-candle-e2e-${{ github.run_id }}
+          path: telegram-current-candle-e2e.json
+          if-no-files-found: warn
