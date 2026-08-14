@@ -3,7 +3,7 @@ name: One-time Telegram message cleanup deployment
 on:
   push:
     branches:
-      - ops/telegram-message-cleanup-deploy-20260814
+      - main
 
 permissions:
   id-token: write
