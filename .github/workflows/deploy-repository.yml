@@ -9,7 +9,7 @@ on:
         default: production
         type: string
       target_repository:
-        description: Repository directory name already checked out on EC2
+        description: GitHub repository directory name already checked out on EC2
         required: true
         type: string
       target_ref:
@@ -48,6 +48,7 @@ jobs:
 
       - name: Deploy through SSM
         env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
           TARGET_REPOSITORY: ${{ inputs.target_repository }}
           TARGET_REF: ${{ inputs.target_ref }}
@@ -79,7 +80,7 @@ jobs:
             --arg app "$TARGET_REPOSITORY" \
             '{commands: [
               "set -u",
-              ("echo DEPLOY_BEGIN"),
+              "echo DEPLOY_BEGIN",
               ("echo APPLICATION_PATH=" + $path),
               ("echo TARGET_REF=" + $ref),
               ("echo RUNTIME_ACTION=" + $action),
