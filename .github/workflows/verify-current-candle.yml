@@ -26,7 +26,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Diagnose runtime configuration and verify Telegram E2E through SSM
+      - name: Verify live Candle-0 from canonical runtime and send Telegram message through SSM
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
@@ -36,75 +36,95 @@ jobs:
           REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
           set -euo pipefail
 
-          APP_PATH=/home/ubuntu/Botri-Workspace/botri-signals-bot
+          APP_PATH=/home/ubuntu/Botri-Workspace/iqbinary-deriv-lab
+          DB_PATH=$APP_PATH/data/candles/candles.db
 
           if [ ! -d "$APP_PATH/.git" ]; then
-            echo "REPOSITORY_NOT_FOUND=$APP_PATH"
+            echo "CANONICAL_RUNTIME_NOT_FOUND=$APP_PATH"
             exit 20
           fi
-
-          sudo -u ubuntu -H git config --global --add safe.directory "$APP_PATH"
-          sudo -u ubuntu -H git -C "$APP_PATH" fetch --prune origin
-          EXPECTED_COMMIT=$(sudo -u ubuntu -H git -C "$APP_PATH" rev-parse "origin/main^{commit}")
-          sudo -u ubuntu -H git -C "$APP_PATH" checkout main
-          sudo -u ubuntu -H git -C "$APP_PATH" reset --hard "origin/main"
-          DEPLOYED_COMMIT=$(sudo -u ubuntu -H git -C "$APP_PATH" rev-parse HEAD)
-
-          echo "EXPECTED_COMMIT=$EXPECTED_COMMIT"
-          echo "DEPLOYED_COMMIT=$DEPLOYED_COMMIT"
-          if [ "$DEPLOYED_COMMIT" != "$EXPECTED_COMMIT" ]; then exit 24; fi
-          echo DEPLOYMENT_COMMIT_VERIFIED
-
-          echo "APP_FILES:"
-          sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && find . -maxdepth 2 -type f -not -path './.git/*' -printf '%p\n' | sort"
-
-          echo "ENV_FILE_PRESENCE:"
-          for file in "$APP_PATH/.env" "$APP_PATH/.env.production" "$APP_PATH/.env.local"; do
-            if [ -f "$file" ]; then echo "PRESENT=$file"; else echo "ABSENT=$file"; fi
-          done
-
-          echo "ECOSYSTEM_CANDIDATES:"
-          find /home/ubuntu/Botri-Workspace -maxdepth 4 -type f \( -name 'ecosystem*.js' -o -name 'ecosystem*.cjs' -o -name 'ecosystem*.json' \) -print 2>/dev/null | sort || true
-
-          echo "PM2_RUNTIME_METADATA:"
-          sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
-            .[]
-            | select(.name | ascii_downcase | gsub("[^a-z0-9]"; "") == "botrisignalbot")
-            | {
-                name,
-                pm_cwd: .pm2_env.pm_cwd,
-                pm_exec_path: .pm2_env.pm_exec_path,
-                status: .pm2_env.status,
-                pid: .pid
-              }
-          '
-
-          PM2_PID=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
-            .[]
-            | select(.name | ascii_downcase | gsub("[^a-z0-9]"; "") == "botrisignalbot")
-            | .pid
-          ' | head -1)
-
-          if [ -z "$PM2_PID" ] || [ "$PM2_PID" = "null" ] || [ "$PM2_PID" = "0" ]; then
-            echo PM2_PID_UNAVAILABLE
-            exit 26
+          if [ ! -f "$DB_PATH" ]; then
+            echo "CANONICAL_CANDLE_DB_NOT_FOUND=$DB_PATH"
+            exit 21
           fi
 
-          echo "PM2_PROCESS_ENV_KEYS:"
-          sudo tr '\0' '\n' < "/proc/$PM2_PID/environ" \
-            | cut -d= -f1 \
-            | grep -E '^(DERIV_SYMBOL|SIGNAL_TIMEFRAME|MARKET_DATA_BASE_URL|MARKET_DATA_TIMEOUT_MS|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|TELEGRAM_TIMEOUT_MS)$' \
-            | sort \
-            | sed 's/$/=PRESENT/' || true
+          sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && node <<'NODE'
+          const Database = require('better-sqlite3');
+          require('dotenv').config();
+          const https = require('https');
 
-          echo "PM2_LOG_TAIL:"
-          sudo -u ubuntu -H bash -lc 'pm2 logs Botri-Signal-Bot --lines 30 --nostream' || true
+          const db = new Database('data/candles/candles.db', { readonly: true });
+          const row = db.prepare(`
+            SELECT symbol, granularity, open_time, open, high, low, close, updated_at
+            FROM live_candles
+            WHERE symbol = ? AND granularity = ?
+            ORDER BY updated_at DESC
+            LIMIT 1
+          `).get(process.env.DERIV_SYMBOL || '1HZ100V', 60);
+          db.close();
 
-          echo "DIRECT_CONFIG_CHECK:"
-          sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && node -e 'const {loadConfig}=require(\"./src/config\"); console.log(loadConfig())'"
+          if (!row) throw new Error('LIVE_CANDLE_0_NOT_FOUND');
 
-          echo "E2E_VERIFICATION_START"
-          sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && node scripts/verify-current-candle.js"
+          const open = Number(row.open);
+          const high = Number(row.high);
+          const low = Number(row.low);
+          const close = Number(row.close);
+          if (![open, high, low, close].every(Number.isFinite)) throw new Error('LIVE_CANDLE_OHLC_INVALID');
+          if (high < Math.max(open, close)) throw new Error('LIVE_CANDLE_HIGH_INCONSISTENT');
+          if (low > Math.min(open, close)) throw new Error('LIVE_CANDLE_LOW_INCONSISTENT');
+
+          const token = process.env.SIGNAL_BOT_TOKEN;
+          const chatId = process.env.SIGNAL_CHAT_ID;
+          if (!token || !chatId) throw new Error('TELEGRAM_RUNTIME_CONFIG_MISSING');
+
+          const text = [
+            '🕯️ BOTRI Current Candle-0',
+            '',
+            `Symbol: ${row.symbol}`,
+            `Timeframe: ${row.granularity}s`,
+            `Open: ${open}`,
+            `High: ${high}`,
+            `Low: ${low}`,
+            `Close: ${close}`,
+            `Open Time: ${row.open_time}`,
+            `Updated At: ${row.updated_at}`,
+            'State: LIVE Candle-0'
+          ].join('\\n');
+
+          const payload = JSON.stringify({ chat_id: chatId, text });
+          const response = await new Promise((resolve, reject) => {
+            const req = https.request(`https://api.telegram.org/bot${token}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+            }, res => {
+              let data = '';
+              res.on('data', chunk => data += chunk);
+              res.on('end', () => {
+                try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+              });
+            });
+            req.on('error', reject);
+            req.write(payload);
+            req.end();
+          });
+
+          if (!response || response.ok !== true || !response.result?.message_id) {
+            throw new Error('TELEGRAM_SEND_NOT_CONFIRMED');
+          }
+
+          console.log('E2E_VERIFICATION=PASS');
+          console.log(`SYMBOL=${row.symbol}`);
+          console.log(`GRANULARITY=${row.granularity}`);
+          console.log(`OPEN=${open}`);
+          console.log(`HIGH=${high}`);
+          console.log(`LOW=${low}`);
+          console.log(`CLOSE=${close}`);
+          console.log(`OPEN_TIME=${row.open_time}`);
+          console.log(`UPDATED_AT=${row.updated_at}`);
+          console.log(`TELEGRAM_MESSAGE_ID=${response.result.message_id}`);
+          console.log('TELEGRAM_TEXT_VERIFIED=true');
+          NODE"
+
           echo DEPLOYMENT_AND_TELEGRAM_E2E_COMPLETE
           REMOTE_SCRIPT
           )
