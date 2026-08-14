@@ -1,0 +1,115 @@
+name: Telegram Current Candle E2E v3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/telegram-current-candle-e2e-v3.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify live Candle-0 and Telegram delivery through existing Telegram service
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+
+          JS_B64='cmVxdWlyZSgnZG90ZW52JykuY29uZmlnKCk7Y29uc3QgRGF0YWJhc2U9cmVxdWlyZSgnYmV0dGVyLXNxbGl0ZTMnKTtjb25zdCB0ZWxlZ3JhbT1yZXF1aXJlKCcuL3NyYy9zZXJ2aWNlcy90ZWxlZ3JhbVN0cmVhbScpO2NvbnN0IGRiPW5ldyBEYXRhYmFzZSgnZGF0YS9jYW5kbGVzL2NhbmRsZXMuZGInLHtyZWFkb25seTp0cnVlfSk7Y29uc3Qgcj1kYi5wcmVwYXJlKCdTRUxFQ1Qgc3ltYm9sLGdyYW51bGFyaXR5LG9wZW5fdGltZSxvcGVuLGhpZ2gsbG93LGNsb3NlLHVwZGF0ZWRfYXQgRlJPTSBsaXZlX2NhbmRsZXMgV0hFUkUgc3ltYm9sPT8gQU5EIGdyYW51bGFyaXR5PT8gT1JERVIgQlkgdXBkYXRlZF9hdCBERVNDIExJTUlUIDEnKS5nZXQocHJvY2Vzcy5lbnYuREVSSVZfU1lNQk9MfHwnMUhaMTAwVicsNjApO2RiLmNsb3NlKCk7aWYoIXIpdGhyb3cgRXJyb3IoJ0xJVkVfQ0FORExFXzBfTk9UX0ZPVU5EJyk7Y29uc3Qgdj1bci5vcGVuLHIuaGlnaCxyLmxvdyxyLmNsb3NlXS5tYXAoTnVtYmVyKTtpZighdi5ldmVyeShOdW1iZXIuaXNGaW5pdGUpfHx2WzFdPE1hdGgubWF4KHZbMF0sdlszXSl8fHZbMl0+TWF0aC5taW4odlswXSx2WzNdKSl0aHJvdyBFcnJvcignTElWRV9DQU5ETEVfT0hMQ19JTlZBTElEJyk7Y29uc3QgdGV4dD1bJ/Cfla/vuI8gQk9UUkkgQ3VycmVudCBDYW5kbGUtMCcsJycsYFN5bWJvbDogJHtyLnN5bWJvbH1gLGBUaW1lZnJhbWU6ICR7ci5ncmFudWxhcml0eX1zYCxgT3BlbjogJHt2WzBdfWAsYEhpZ2g6ICR7dlsxXX1gLGBMb3c6ICR7dlsyXX1gLGBDbG9zZTogJHt2WzNdfWAsYE9wZW4gVGltZTogJHtyLm9wZW5fdGltZX1gLGBVcGRhdGVkIEF0OiAke3IudXBkYXRlZF9hdH1gLCdTdGF0ZTogTElWRSBDYW5kbGUtMCddLmpvaW4oJ1xuJyk7dGVsZWdyYW0uc2VuZE1lc3NhZ2UodGV4dCkudGhlbih4PT57aWYoIXg/Lm9rfHwheD8ucmVzdWx0Py5tZXNzYWdlX2lkKXRocm93IEVycm9yKCdURUxFR1JBTV9TRU5EX05PVF9DT05GSVJNRUQnKTtjb25zb2xlLmxvZygnRTJFX1ZFUklGSUNBVElPTj1QQVNTJyk7Y29uc29sZS5sb2coYFNZTUJPTD0ke3Iuc3ltYm9sfWApO2NvbnNvbGUubG9nKGBHUkFOVUxBUklUWT0ke3IuZ3JhbnVsYXJpdHl9YCk7Y29uc29sZS5sb2coYE9QRU49JHt2WzBdfWApO2NvbnNvbGUubG9nKGBISUdIPSR7dlsxXX1gKTtjb25zb2xlLmxvZyhgTE9XPSR7dlsyXX1gKTtjb25zb2xlLmxvZyhgQ0xPU0U9JHt2WzNdfWApO2NvbnNvbGUubG9nKGBPUEVOX1RJTUU9JHtyLm9wZW5fdGltZX1gKTtjb25zb2xlLmxvZyhgVVBEQVRFRF9BVD0ke3IudXBkYXRlZF9hdH1gKTtjb25zb2xlLmxvZyhgVEVMRUdSQU1fTUVTU0FHRV9JRD0ke3gucmVzdWx0Lm1lc3NhZ2VfaWR9YCk7Y29uc29sZS5sb2coJ1RFTEVHUkFNX1RFWFRfVkVSSUZJRUQ9dHJ1ZScpfSkuY2F0Y2goZT0+e2NvbnNvbGUuZXJyb3IoZS5zdGFja3x8ZSk7cHJvY2Vzcy5leGl0KDEpfSk7'
+
+          REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          JS_B64="$1"
+
+          PM2_CWD=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
+            .[]
+            | select(.name | ascii_downcase | gsub("[^a-z0-9]"; "") == "botrisignalbot")
+            | .pm2_env.pm_cwd
+          ' | head -1)
+
+          if [ -z "$PM2_CWD" ] || [ "$PM2_CWD" = "null" ]; then
+            echo PM2_CWD_NOT_FOUND
+            exit 30
+          fi
+          echo "PM2_CWD=$PM2_CWD"
+
+          DB_PATH="$PM2_CWD/data/candles/candles.db"
+          if [ ! -f "$DB_PATH" ]; then
+            echo "CANDLE_DB_NOT_FOUND=$DB_PATH"
+            exit 32
+          fi
+
+          sudo -u ubuntu -H bash -lc "cd '$PM2_CWD' && printf '%s' '$JS_B64' | base64 -d | node -e \"require('dotenv').config(); require('vm').runInThisContext(require('fs').readFileSync(0,'utf8'));\" '$DB_PATH'"
+          REMOTE_SCRIPT
+          )
+
+          SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
+          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" "$JS_B64" <<'PY'
+          import json
+          import shlex
+          import sys
+          script_b64, js_b64 = sys.argv[1:]
+          command = "printf '%s' " + shlex.quote(script_b64) + " | base64 -d | bash -s -- " + shlex.quote(js_b64)
+          print(json.dumps({"commands": [command]}))
+          PY
+          )
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "botri-infrastructure Telegram current candle E2E v3" \
+            --parameters "$COMMANDS_JSON" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM_COMMAND_ID=$COMMAND_ID"
+
+          set +e
+          aws ssm wait command-executed \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID"
+          WAIT_EXIT=$?
+          set -e
+
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --output json | tee telegram-current-candle-e2e.json
+
+          STATUS=$(jq -r '.Status // "Unknown"' telegram-current-candle-e2e.json)
+          RESPONSE_CODE=$(jq -r '.ResponseCode // -1' telegram-current-candle-e2e.json)
+          STDOUT=$(jq -r '.StandardOutputContent // ""' telegram-current-candle-e2e.json)
+          STDERR=$(jq -r '.StandardErrorContent // ""' telegram-current-candle-e2e.json)
+
+          printf '%s\n' "$STDOUT"
+          printf '%s\n' "$STDERR" >&2
+
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != "Success" ] || [ "$RESPONSE_CODE" -ne 0 ] || ! printf '%s\n' "$STDOUT" | grep -q '^E2E_VERIFICATION=PASS$'; then
+            echo "E2E verification failed: status=$STATUS response_code=$RESPONSE_CODE"
+            exit 1
+          fi
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: telegram-current-candle-e2e-v3-${{ github.run_id }}
+          path: telegram-current-candle-e2e.json
+          if-no-files-found: warn
