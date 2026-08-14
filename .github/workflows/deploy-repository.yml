@@ -68,33 +68,105 @@ jobs:
             *) echo 'Rejected: invalid runtime_action'; exit 2 ;;
           esac
 
-          COMMANDS_JSON=$(jq -n \
-            --arg preferred "$APPLICATION_PATH" \
-            --arg ref "$TARGET_REF" \
-            --arg action "$RUNTIME_ACTION" \
-            --arg repo "$TARGET_REPOSITORY" \
-            '{commands: [
-              "set -u",
-              "echo DEPLOY_BEGIN",
-              ("PREFERRED_PATH=" + ($preferred|@sh)),
-              ("TARGET_REF=" + ($ref|@sh)),
-              ("RUNTIME_ACTION=" + ($action|@sh)),
-              ("TARGET_REPOSITORY=" + ($repo|@sh)),
-              "DEPLOY_PATH=",
-              "if [ -d \"$PREFERRED_PATH/.git\" ]; then DEPLOY_PATH=\"$PREFERRED_PATH\"; fi",
-              "if [ -z \"$DEPLOY_PATH\" ]; then while IFS= read -r gitdir; do candidate=${gitdir%/.git}; if git -C \"$candidate\" remote get-url origin 2>/dev/null | grep -qiE \"(^|[/:])${TARGET_REPOSITORY}([.]git)?$\"; then DEPLOY_PATH=\"$candidate\"; break; fi; done < <(find /home/ubuntu -type d -name .git -prune -print 2>/dev/null); fi",
-              "if [ -z \"$DEPLOY_PATH\" ]; then echo REPOSITORY_NOT_FOUND; echo DISCOVERY_CANDIDATES; find /home/ubuntu -maxdepth 5 -type d -name .git -prune -print 2>/dev/null | sed 's#/.git$##'; exit 20; fi",
-              "echo DEPLOY_PATH=$DEPLOY_PATH",
-              "git -C \"$DEPLOY_PATH\" rev-parse --show-toplevel",
-              "git -C \"$DEPLOY_PATH\" remote -v",
-              "GIT_TERMINAL_PROMPT=0 git -C \"$DEPLOY_PATH\" fetch --prune origin",
-              "git -C \"$DEPLOY_PATH\" checkout \"$TARGET_REF\"",
-              "git -C \"$DEPLOY_PATH\" reset --ff-only \"origin/$TARGET_REF\"",
-              "echo DEPLOYED_COMMIT=$(git -C \"$DEPLOY_PATH\" rev-parse HEAD)",
-              "if [ \"$RUNTIME_ACTION\" = restart ] || [ \"$RUNTIME_ACTION\" = reload ]; then PM2_APP=$(pm2 jlist 2>/dev/null | jq -r --arg n \"$TARGET_REPOSITORY\" '.[] | select((.name|ascii_downcase) == ($n|ascii_downcase)) | .name' | head -1); if [ -z \"$PM2_APP\" ]; then echo PM2_APP_NOT_FOUND; pm2 status; exit 21; fi; echo PM2_APP=$PM2_APP; if [ \"$RUNTIME_ACTION\" = restart ]; then pm2 restart \"$PM2_APP\"; else pm2 reload \"$PM2_APP\"; fi; fi",
-              "pm2 status",
-              "echo DEPLOYMENT_COMPLETE"
-            ]}')
+          REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -u
+          PREFERRED_PATH="$1"
+          TARGET_REF="$2"
+          RUNTIME_ACTION="$3"
+          TARGET_REPOSITORY="$4"
+          DEPLOY_PATH=""
+
+          echo DEPLOY_BEGIN
+          echo "PREFERRED_PATH=$PREFERRED_PATH"
+          echo "TARGET_REF=$TARGET_REF"
+          echo "RUNTIME_ACTION=$RUNTIME_ACTION"
+          echo "TARGET_REPOSITORY=$TARGET_REPOSITORY"
+
+          if [ -d "$PREFERRED_PATH/.git" ]; then
+            DEPLOY_PATH="$PREFERRED_PATH"
+          fi
+
+          if [ -z "$DEPLOY_PATH" ]; then
+            while IFS= read -r gitdir; do
+              candidate="${gitdir%/.git}"
+              origin_url=$(git -C "$candidate" remote get-url origin 2>/dev/null || true)
+              if printf '%s\n' "$origin_url" | grep -qiE "(^|[/:])${TARGET_REPOSITORY}(\.git)?$"; then
+                DEPLOY_PATH="$candidate"
+                break
+              fi
+            done < <(find /home/ubuntu -type d -name .git -prune -print 2>/dev/null)
+          fi
+
+          if [ -z "$DEPLOY_PATH" ]; then
+            echo REPOSITORY_NOT_FOUND
+            echo DISCOVERY_CANDIDATES
+            find /home/ubuntu -maxdepth 6 -type d -name .git -prune -print 2>/dev/null | sed 's#/.git$##'
+            exit 20
+          fi
+
+          echo "DEPLOY_PATH=$DEPLOY_PATH"
+          git -C "$DEPLOY_PATH" rev-parse --show-toplevel
+          git -C "$DEPLOY_PATH" remote -v
+          GIT_TERMINAL_PROMPT=0 git -C "$DEPLOY_PATH" fetch --prune origin
+          git -C "$DEPLOY_PATH" checkout "$TARGET_REF"
+          git -C "$DEPLOY_PATH" reset --ff-only "origin/$TARGET_REF"
+          echo "DEPLOYED_COMMIT=$(git -C "$DEPLOY_PATH" rev-parse HEAD)"
+
+          if [ "$RUNTIME_ACTION" = restart ] || [ "$RUNTIME_ACTION" = reload ]; then
+            PM2_USER=""
+            for user in ubuntu; do
+              if id "$user" >/dev/null 2>&1 && sudo -u "$user" -H bash -lc 'command -v pm2 >/dev/null 2>&1 && pm2 jlist >/dev/null 2>&1'; then
+                PM2_USER="$user"
+                break
+              fi
+            done
+
+            if [ -z "$PM2_USER" ]; then
+              echo PM2_USER_NOT_FOUND
+              exit 21
+            fi
+
+            PM2_APP=$(sudo -u "$PM2_USER" -H bash -lc 'pm2 jlist' | jq -r --arg n "$TARGET_REPOSITORY" '.[] | select((.name|ascii_downcase) == ($n|ascii_downcase)) | .name' | head -1)
+
+            if [ -z "$PM2_APP" ]; then
+              echo PM2_APP_NOT_FOUND
+              sudo -u "$PM2_USER" -H bash -lc 'pm2 status'
+              exit 22
+            fi
+
+            echo "PM2_USER=$PM2_USER"
+            echo "PM2_APP=$PM2_APP"
+
+            if [ "$RUNTIME_ACTION" = restart ]; then
+              sudo -u "$PM2_USER" -H bash -lc "pm2 restart $(printf '%q' "$PM2_APP")"
+            else
+              sudo -u "$PM2_USER" -H bash -lc "pm2 reload $(printf '%q' "$PM2_APP")"
+            fi
+          fi
+
+          if id ubuntu >/dev/null 2>&1; then
+            sudo -u ubuntu -H bash -lc 'pm2 status' || true
+          fi
+          echo DEPLOYMENT_COMPLETE
+          REMOTE_SCRIPT
+          )
+
+          SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
+
+          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" "$APPLICATION_PATH" "$TARGET_REF" "$RUNTIME_ACTION" "$TARGET_REPOSITORY" <<'PY'
+          import json
+          import shlex
+          import sys
+
+          script_b64, preferred, ref, action, repo = sys.argv[1:]
+          command = (
+              "printf '%s' " + shlex.quote(script_b64) +
+              " | base64 -d | bash -s -- " +
+              " ".join(shlex.quote(value) for value in (preferred, ref, action, repo))
+          )
+          print(json.dumps({"commands": [command]}))
+          PY
+          )
 
           COMMAND_ID=$(aws ssm send-command \
             --region "$AWS_REGION" \
