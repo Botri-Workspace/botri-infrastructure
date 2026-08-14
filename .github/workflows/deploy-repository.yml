@@ -11,6 +11,7 @@ on:
       target_repository:
         description: Repository directory name to deploy on EC2
         required: true
+        default: botri-market-data
         type: string
       target_ref:
         description: Git ref to deploy
@@ -18,18 +19,40 @@ on:
         default: main
         type: string
       application_path:
-        description: Preferred application path on EC2; missing repositories are bootstrapped there
+        description: Preferred application path on EC2
         required: true
+        default: /home/ubuntu/Botri-Workspace/botri-market-data
         type: string
       runtime_action:
         description: Runtime action after synchronization
         required: true
-        default: none
+        default: restart
         type: choice
         options:
           - none
           - restart
           - reload
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        type: string
+        default: production
+      target_repository:
+        required: true
+        type: string
+      target_ref:
+        required: false
+        type: string
+        default: main
+      application_path:
+        required: true
+        type: string
+      runtime_action:
+        required: false
+        type: string
+        default: restart
+    secrets: {}
 
 permissions:
   id-token: write
@@ -38,7 +61,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment || 'production' }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -46,7 +69,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Deploy through SSM
+      - name: Deploy through existing EC2 SSM path
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
@@ -56,7 +79,6 @@ jobs:
           RUNTIME_ACTION: ${{ inputs.runtime_action }}
         run: |
           set -euo pipefail
-
           case "$TARGET_REPOSITORY" in
             ''|*[!A-Za-z0-9._-]*) echo 'Rejected: invalid target_repository'; exit 2 ;;
           esac
@@ -72,237 +94,61 @@ jobs:
             *) echo 'Rejected: application_path must be under /home/ubuntu/Botri-Workspace'; exit 2 ;;
           esac
 
-          REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
-          set -euo pipefail
-
+          REMOTE_SCRIPT='set -euo pipefail
           PREFERRED_PATH="$1"
           TARGET_REF="$2"
           RUNTIME_ACTION="$3"
           TARGET_REPOSITORY="$4"
-          DEPLOY_PATH=""
-          BOOTSTRAP_PATH="$PREFERRED_PATH"
+          DEPLOY_PATH="$PREFERRED_PATH"
           REPO_SSH="git@github.com:Botri-Workspace/${TARGET_REPOSITORY}.git"
           REPO_HTTPS="https://github.com/Botri-Workspace/${TARGET_REPOSITORY}.git"
-
-          echo DEPLOY_BEGIN
-          echo "PREFERRED_PATH=$PREFERRED_PATH"
-          echo "TARGET_REF=$TARGET_REF"
-          echo "RUNTIME_ACTION=$RUNTIME_ACTION"
-          echo "TARGET_REPOSITORY=$TARGET_REPOSITORY"
-
-          if [ -d "$PREFERRED_PATH/.git" ]; then
-            DEPLOY_PATH="$PREFERRED_PATH"
-          fi
-
-          if [ -z "$DEPLOY_PATH" ]; then
-            while IFS= read -r gitdir; do
-              candidate="${gitdir%/.git}"
-              origin_url=$(git -C "$candidate" -c safe.directory="$candidate" remote get-url origin 2>/dev/null || true)
-              if printf '%s\n' "$origin_url" | grep -qiE "(^|[/:])${TARGET_REPOSITORY}(\.git)?$"; then
-                DEPLOY_PATH="$candidate"
-                break
-              fi
-            done < <(find /home/ubuntu -type d -name .git -prune -print 2>/dev/null)
-          fi
-
-          if [ -z "$DEPLOY_PATH" ]; then
-            echo REPOSITORY_MISSING_BOOTSTRAP_REQUIRED
-            mkdir -p "$(dirname "$BOOTSTRAP_PATH")"
-
-            if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' sudo -u ubuntu -H git ls-remote "$REPO_SSH" HEAD >/dev/null 2>&1; then
-              echo BOOTSTRAP_AUTH=ssh
-              sudo -u ubuntu -H git clone --branch "$TARGET_REF" --single-branch "$REPO_SSH" "$BOOTSTRAP_PATH"
-              DEPLOY_PATH="$BOOTSTRAP_PATH"
-            elif GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git ls-remote "$REPO_HTTPS" HEAD >/dev/null 2>&1; then
-              echo BOOTSTRAP_AUTH=https-credential-helper
-              sudo -u ubuntu -H git clone --branch "$TARGET_REF" --single-branch "$REPO_HTTPS" "$BOOTSTRAP_PATH"
-              DEPLOY_PATH="$BOOTSTRAP_PATH"
+          if [ ! -d "$DEPLOY_PATH/.git" ]; then
+            mkdir -p "$(dirname "$DEPLOY_PATH")"
+            if sudo -u ubuntu -H git ls-remote "$REPO_SSH" HEAD >/dev/null 2>&1; then
+              sudo -u ubuntu -H git clone --branch "$TARGET_REF" --single-branch "$REPO_SSH" "$DEPLOY_PATH"
+            elif sudo -u ubuntu -H git ls-remote "$REPO_HTTPS" HEAD >/dev/null 2>&1; then
+              sudo -u ubuntu -H git clone --branch "$TARGET_REF" --single-branch "$REPO_HTTPS" "$DEPLOY_PATH"
             elif command -v gh >/dev/null 2>&1 && sudo -u ubuntu -H gh auth status >/dev/null 2>&1; then
-              echo BOOTSTRAP_AUTH=gh
-              sudo -u ubuntu -H gh repo clone "Botri-Workspace/${TARGET_REPOSITORY}" "$BOOTSTRAP_PATH" -- --branch "$TARGET_REF" --single-branch
-              DEPLOY_PATH="$BOOTSTRAP_PATH"
+              sudo -u ubuntu -H gh repo clone "Botri-Workspace/${TARGET_REPOSITORY}" "$DEPLOY_PATH" -- --branch "$TARGET_REF" --single-branch
             else
               echo GITHUB_AUTH_UNAVAILABLE
-              echo 'No usable existing SSH, HTTPS credential-helper, or gh authentication was found on EC2.'
-              echo 'No credential or token was printed.'
               exit 20
             fi
           fi
-
-          if [ ! -d "$DEPLOY_PATH/.git" ]; then
-            echo REPOSITORY_BOOTSTRAP_FAILED
-            exit 23
-          fi
-
-          chown -R ubuntu:ubuntu "$DEPLOY_PATH"
-          sudo -u ubuntu -H git config --global --add safe.directory "$DEPLOY_PATH"
-
-          echo "DEPLOY_PATH=$DEPLOY_PATH"
-          sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse --show-toplevel
-          sudo -u ubuntu -H git -C "$DEPLOY_PATH" remote -v
-
-          GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git -C "$DEPLOY_PATH" fetch --prune origin
-
-          EXPECTED_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse "origin/$TARGET_REF^{commit}")
-          echo "EXPECTED_COMMIT=$EXPECTED_COMMIT"
-
+          sudo -u ubuntu -H git -C "$DEPLOY_PATH" fetch --prune origin
           sudo -u ubuntu -H git -C "$DEPLOY_PATH" checkout "$TARGET_REF"
           sudo -u ubuntu -H git -C "$DEPLOY_PATH" reset --hard "origin/$TARGET_REF"
-
+          EXPECTED_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse "origin/$TARGET_REF^{commit}")
           DEPLOYED_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse HEAD)
+          test "$DEPLOYED_COMMIT" = "$EXPECTED_COMMIT"
           echo "DEPLOYED_COMMIT=$DEPLOYED_COMMIT"
-
-          if [ "$DEPLOYED_COMMIT" != "$EXPECTED_COMMIT" ]; then
-            echo "DEPLOYMENT_COMMIT_MISMATCH expected=$EXPECTED_COMMIT deployed=$DEPLOYED_COMMIT"
-            exit 24
-          fi
-
-          ORIGIN_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse "origin/$TARGET_REF^{commit}")
-          if [ "$DEPLOYED_COMMIT" != "$ORIGIN_COMMIT" ]; then
-            echo "DEPLOYMENT_ORIGIN_MISMATCH origin=$ORIGIN_COMMIT deployed=$DEPLOYED_COMMIT"
-            exit 25
-          fi
-
-          echo DEPLOYMENT_COMMIT_VERIFIED
-
           if [ "$RUNTIME_ACTION" = restart ] || [ "$RUNTIME_ACTION" = reload ]; then
-            PM2_USER=""
-            for user in ubuntu; do
-              if id "$user" >/dev/null 2>&1 && sudo -u "$user" -H bash -lc 'command -v pm2 >/dev/null 2>&1 && pm2 jlist >/dev/null 2>&1'; then
-                PM2_USER="$user"
-                break
-              fi
-            done
-
-            if [ -z "$PM2_USER" ]; then
-              echo PM2_USER_NOT_FOUND
+            if ! sudo -u ubuntu -H bash -lc "command -v pm2 >/dev/null 2>&1"; then
+              echo PM2_NOT_AVAILABLE
               exit 21
             fi
-
-            TARGET_NORMALIZED=$(printf '%s' "$TARGET_REPOSITORY" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]')
-            TARGET_SINGULARIZED=$(printf '%s' "$TARGET_REPOSITORY" | tr '[:upper:]' '[:lower:]' | sed -E 's/signals-bot$/signal-bot/' | tr -cd '[:alnum:]')
-
-            PM2_APP=$(sudo -u "$PM2_USER" -H bash -lc 'pm2 jlist' | jq -r --arg n "$TARGET_NORMALIZED" --arg s "$TARGET_SINGULARIZED" '
-              .[]
-              | .name as $name
-              | ($name | ascii_downcase | gsub("[^a-z0-9]"; "")) as $norm
-              | select($norm == $n or $norm == $s)
-              | $name
-            ' | head -1)
-
-            if [ -z "$PM2_APP" ]; then
-              echo PM2_APP_NOT_FOUND
-              sudo -u "$PM2_USER" -H bash -lc 'pm2 status'
-              exit 22
-            fi
-
-            echo "PM2_USER=$PM2_USER"
-            echo "PM2_APP=$PM2_APP"
-
-            if [ "$RUNTIME_ACTION" = restart ]; then
-              sudo -u "$PM2_USER" -H bash -lc "pm2 restart $(printf '%q' "$PM2_APP")"
-            else
-              sudo -u "$PM2_USER" -H bash -lc "pm2 reload $(printf '%q' "$PM2_APP")"
-            fi
-
+            sudo -u ubuntu -H bash -lc "pm2 restart botri-market-data || pm2 restart botri-market-data-storage"
             sleep 2
-
-            PM2_STATE=$(sudo -u "$PM2_USER" -H bash -lc 'pm2 jlist' | jq -r --arg app "$PM2_APP" '
-              .[]
-              | select(.name == $app)
-              | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring)]
-              | @tsv
-            ' | head -1)
-
-            if [ -z "$PM2_STATE" ]; then
-              echo PM2_RUNTIME_ENTRY_NOT_FOUND
-              sudo -u "$PM2_USER" -H bash -lc 'pm2 status'
-              exit 26
-            fi
-
-            PM2_STATUS=$(printf '%s' "$PM2_STATE" | cut -f1)
-            PM2_PID=$(printf '%s' "$PM2_STATE" | cut -f2)
-            echo "PM2_STATUS=$PM2_STATUS"
-            echo "PM2_PID=$PM2_PID"
-
-            if [ "$PM2_STATUS" != "online" ] || ! printf '%s' "$PM2_PID" | grep -Eq '^[1-9][0-9]*$'; then
-              echo "PM2_RUNTIME_NOT_HEALTHY status=$PM2_STATUS pid=$PM2_PID"
-              sudo -u "$PM2_USER" -H bash -lc 'pm2 status'
-              exit 27
-            fi
-
-            echo PM2_RUNTIME_VERIFIED
+            sudo -u ubuntu -H bash -lc "pm2 status"
           fi
-
-          if id ubuntu >/dev/null 2>&1; then
-            sudo -u ubuntu -H bash -lc 'pm2 status' || true
-          fi
-
-          echo DEPLOYMENT_COMPLETE
-          REMOTE_SCRIPT
-          )
+          echo DEPLOYMENT_COMPLETE'
 
           SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
-
-          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" "$APPLICATION_PATH" "$TARGET_REF" "$RUNTIME_ACTION" "$TARGET_REPOSITORY" <<'PY'
-          import json
-          import shlex
-          import sys
-
-          script_b64, preferred, ref, action, repo = sys.argv[1:]
-          command = (
-              "printf '%s' " + shlex.quote(script_b64) +
-              " | base64 -d | bash -s -- " +
-              " ".join(shlex.quote(value) for value in (preferred, ref, action, repo))
-          )
-          print(json.dumps({"commands": [command]}))
-          PY
-          )
-
           COMMAND_ID=$(aws ssm send-command \
             --region "$AWS_REGION" \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
-            --comment "botri-infrastructure deployment ${TARGET_REPOSITORY}@${TARGET_REF}" \
-            --parameters "$COMMANDS_JSON" \
+            --comment "botri-market-data EC2 runtime verification" \
+            --parameters "commands=[\"printf '%s' '$SCRIPT_B64' | base64 -d | bash -s -- '$APPLICATION_PATH' '$TARGET_REF' '$RUNTIME_ACTION' '$TARGET_REPOSITORY'\"]" \
             --query 'Command.CommandId' --output text)
-
           echo "SSM_COMMAND_ID=$COMMAND_ID"
-
-          set +e
-          aws ssm wait command-executed \
-            --region "$AWS_REGION" \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID"
-          WAIT_EXIT=$?
-          set -e
-
-          aws ssm get-command-invocation \
-            --region "$AWS_REGION" \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" | tee deployment-result.json
-
-          COMMAND_STATUS=$(jq -r '.Status // "Unknown"' deployment-result.json)
-          COMMAND_STATUS_DETAILS=$(jq -r '.StatusDetails // "Unknown"' deployment-result.json)
-          COMMAND_RESPONSE_CODE=$(jq -r '.ResponseCode // -1' deployment-result.json)
-          COMMAND_STDOUT=$(jq -r '.StandardOutputContent // ""' deployment-result.json)
-          COMMAND_STDERR=$(jq -r '.StandardErrorContent // ""' deployment-result.json)
-
-          printf '%s\n' "$COMMAND_STDOUT"
-          printf '%s\n' "$COMMAND_STDERR" >&2
-          echo "SSM_STATUS=$COMMAND_STATUS"
-          echo "SSM_STATUS_DETAILS=$COMMAND_STATUS_DETAILS"
-          echo "SSM_RESPONSE_CODE=$COMMAND_RESPONSE_CODE"
-
-          if [ "$WAIT_EXIT" -ne 0 ] || [ "$COMMAND_STATUS" != "Success" ] || [ "$COMMAND_RESPONSE_CODE" -ne 0 ]; then
-            echo "SSM deployment failed: status=$COMMAND_STATUS status_details=$COMMAND_STATUS_DETAILS response_code=$COMMAND_RESPONSE_CODE"
-            exit 1
-          fi
+          aws ssm wait command-executed --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" | tee deployment-result.json
 
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ec2-deployment-${{ github.run_id }}
+          name: botri-market-data-ec2-${{ github.run_id }}
           path: deployment-result.json
           if-no-files-found: warn
