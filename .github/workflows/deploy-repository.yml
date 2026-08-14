@@ -41,7 +41,7 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -298,3 +298,11 @@ jobs:
             echo "SSM deployment failed: status=$COMMAND_STATUS status_details=$COMMAND_STATUS_DETAILS response_code=$COMMAND_RESPONSE_CODE"
             exit 1
           fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ec2-deployment-${{ github.run_id }}
+          path: deployment-result.json
+          if-no-files-found: warn
