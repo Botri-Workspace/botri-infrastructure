@@ -23,6 +23,25 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Cancel previous migration SSM commands
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+          COMMAND_IDS=$(aws ssm list-commands \
+            --region "$AWS_REGION" \
+            --filters Key=Status,Values=InProgress \
+            --query 'Commands[?contains(Comment, `canonical signals runtime migration`)].CommandId' \
+            --output text)
+          for command_id in $COMMAND_IDS; do
+            echo "Cancelling stale SSM command: $command_id"
+            aws ssm cancel-command \
+              --region "$AWS_REGION" \
+              --command-id "$command_id" \
+              --instance-ids "$INSTANCE_ID" || true
+          done
+
       - name: Migrate PM2 runtime and verify canonical Telegram path
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
