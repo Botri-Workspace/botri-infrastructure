@@ -26,7 +26,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Execute live candle + Telegram verification through SSM
+      - name: Deploy latest signal bot and verify Telegram E2E through SSM
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
@@ -37,91 +37,72 @@ jobs:
           set -euo pipefail
 
           APP_PATH=/home/ubuntu/Botri-Workspace/botri-signals-bot
-          APP_USER=ubuntu
+          TARGET_REF=main
+          EXPECTED_REPOSITORY=botri-signals-bot
 
           if [ ! -d "$APP_PATH/.git" ]; then
             echo "REPOSITORY_NOT_FOUND=$APP_PATH"
             exit 20
           fi
 
-          sudo -u "$APP_USER" -H bash -lc '
-            set -euo pipefail
-            cd /home/ubuntu/Botri-Workspace/botri-signals-bot
+          sudo -u ubuntu -H git config --global --add safe.directory "$APP_PATH"
+          sudo -u ubuntu -H git -C "$APP_PATH" remote get-url origin
+          GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git -C "$APP_PATH" fetch --prune origin
 
-            node <<'NODE'
-            const { loadConfig } = require("./src/config");
-            const { MarketDataClient } = require("./src/marketDataClient");
-            const { TelegramClient } = require("./src/telegramClient");
-            const { formatCurrentCandleMessage } = require("./src/telegram/currentCandleMessage");
+          EXPECTED_COMMIT=$(sudo -u ubuntu -H git -C "$APP_PATH" rev-parse "origin/$TARGET_REF^{commit}")
+          sudo -u ubuntu -H git -C "$APP_PATH" checkout "$TARGET_REF"
+          sudo -u ubuntu -H git -C "$APP_PATH" reset --hard "origin/$TARGET_REF"
+          DEPLOYED_COMMIT=$(sudo -u ubuntu -H git -C "$APP_PATH" rev-parse HEAD)
 
-            (async () => {
-              const config = loadConfig();
-              const marketDataClient = new MarketDataClient({
-                baseUrl: config.marketDataBaseUrl,
-                timeoutMs: config.marketDataTimeoutMs
-              });
-              const telegramClient = new TelegramClient({
-                token: config.telegramBotToken,
-                chatId: config.telegramChatId,
-                timeoutMs: config.telegramTimeoutMs
-              });
+          echo "EXPECTED_COMMIT=$EXPECTED_COMMIT"
+          echo "DEPLOYED_COMMIT=$DEPLOYED_COMMIT"
 
-              const payload = await marketDataClient.getSeries({
-                symbol: config.symbol,
-                granularity: config.granularity,
-                limit: 1,
-                includeLive: true
-              });
+          if [ "$DEPLOYED_COMMIT" != "$EXPECTED_COMMIT" ]; then
+            echo "DEPLOYMENT_COMMIT_MISMATCH"
+            exit 24
+          fi
 
-              const candle = payload && payload.live;
-              if (!candle) throw new Error("LIVE_CANDLE_0_UNAVAILABLE");
+          echo DEPLOYMENT_COMMIT_VERIFIED
 
-              const values = ["open", "high", "low", "close"].map((field) => Number(candle[field]));
-              if (!values.every(Number.isFinite)) throw new Error("LIVE_CANDLE_OHLC_INVALID");
+          PM2_APP=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '
+            .[]
+            | select(.name | ascii_downcase | gsub("[^a-z0-9]"; "") == "botrisignalbot")
+            | .name
+          ' | head -1)
 
-              const [open, high, low, close] = values;
-              if (high < Math.max(open, close)) throw new Error("LIVE_CANDLE_HIGH_INCONSISTENT");
-              if (low > Math.min(open, close)) throw new Error("LIVE_CANDLE_LOW_INCONSISTENT");
+          if [ -z "$PM2_APP" ]; then
+            echo PM2_APP_NOT_FOUND
+            sudo -u ubuntu -H bash -lc 'pm2 status'
+            exit 22
+          fi
 
-              const message = formatCurrentCandleMessage({
-                symbol: config.symbol,
-                granularity: config.granularity,
-                candle
-              });
+          echo "PM2_APP=$PM2_APP"
+          sudo -u ubuntu -H bash -lc "pm2 restart $(printf '%q' "$PM2_APP")"
+          sleep 3
 
-              const telegramResponse = await telegramClient.sendMessage(message);
-              if (!telegramResponse || telegramResponse.ok !== true) {
-                throw new Error("TELEGRAM_SEND_NOT_CONFIRMED");
-              }
-              if (!telegramResponse.result || !telegramResponse.result.message_id) {
-                throw new Error("TELEGRAM_MESSAGE_ID_MISSING");
-              }
+          PM2_STATE=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r --arg app "$PM2_APP" '
+            .[]
+            | select(.name == $app)
+            | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring)]
+            | @tsv
+          ' | head -1)
 
-              const sentText = telegramResponse.result.text || "";
-              if (!sentText.includes("BOTRI Current Candle")) throw new Error("TELEGRAM_TEXT_MISMATCH");
-              if (!sentText.includes(`State: LIVE Candle-0`)) throw new Error("TELEGRAM_STATE_MISMATCH");
-              for (const [field, value] of [["Open", open], ["High", high], ["Low", low], ["Close", close]]) {
-                if (!sentText.includes(`${field}: ${value}`)) throw new Error(`TELEGRAM_${field.toUpperCase()}_MISMATCH`);
-              }
+          PM2_STATUS=$(printf '%s' "$PM2_STATE" | cut -f1)
+          PM2_PID=$(printf '%s' "$PM2_STATE" | cut -f2)
+          echo "PM2_STATUS=$PM2_STATUS"
+          echo "PM2_PID=$PM2_PID"
 
-              console.log("E2E_VERIFICATION=PASS");
-              console.log(`SYMBOL=${config.symbol}`);
-              console.log(`GRANULARITY=${config.granularity}`);
-              console.log(`OPEN=${open}`);
-              console.log(`HIGH=${high}`);
-              console.log(`LOW=${low}`);
-              console.log(`CLOSE=${close}`);
-              console.log(`OPEN_TIME=${candle.open_time ?? "N/A"}`);
-              console.log(`UPDATED_AT=${candle.updated_at ?? "N/A"}`);
-              console.log(`TELEGRAM_MESSAGE_ID=${telegramResponse.result.message_id}`);
-              console.log("TELEGRAM_TEXT_VERIFIED=true");
-            })().catch((error) => {
-              console.error(`E2E_VERIFICATION=FAIL`);
-              console.error(error.stack || error.message);
-              process.exit(1);
-            });
-            NODE
-          '
+          if [ "$PM2_STATUS" != "online" ] || ! printf '%s' "$PM2_PID" | grep -Eq '^[1-9][0-9]*$'; then
+            echo PM2_RUNTIME_NOT_HEALTHY
+            sudo -u ubuntu -H bash -lc 'pm2 status'
+            exit 27
+          fi
+
+          echo PM2_RUNTIME_VERIFIED
+
+          sudo -u ubuntu -H bash -lc "cd '$APP_PATH' && node scripts/verify-current-candle.js"
+
+          echo DEPLOYMENT_AND_TELEGRAM_E2E_COMPLETE
           REMOTE_SCRIPT
           )
 
