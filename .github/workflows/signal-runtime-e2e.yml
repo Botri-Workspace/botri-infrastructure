@@ -1,0 +1,92 @@
+name: Signal Runtime E2E
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/signal-runtime-e2e.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify real strategy Telegram signal
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+          REMOTE_SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          SIGNALS=/home/ubuntu/Botri-Workspace/botri-signals-bot
+          LOG=$(timeout 90s bash -c '
+            while true; do
+              OUT=$(sudo -u ubuntu -H bash -lc "pm2 logs botri-signals-bot --lines 250 --nostream 2>&1" || true)
+              if printf "%s\n" "$OUT" | grep -Eq "Telegram candle\+signal sent .*message_id=[1-9][0-9]*"; then
+                printf "%s\n" "$OUT"
+                exit 0
+              fi
+              sleep 5
+            done
+          ')
+          LINE=$(printf '%s\n' "$LOG" | grep -E "Telegram candle\+signal sent .*message_id=[1-9][0-9]*" | tail -1)
+          printf '%s\n' "$LINE"
+          LEAD=$(printf '%s\n' "$LINE" | sed -n 's/.*lead_sec=\([0-9.]*\).*/\1/p')
+          SIGNAL=$(printf '%s\n' "$LINE" | sed -n 's/.*signal=\([^ ]*\).*/\1/p')
+          MESSAGE_ID=$(printf '%s\n' "$LINE" | sed -n 's/.*message_id=\([0-9]*\).*/\1/p')
+          python3 - "$LEAD" <<'PY'
+          import sys
+          lead=float(sys.argv[1])
+          if not 2.0 <= lead <= 4.0:
+              raise SystemExit(f"SIGNAL_LEAD_OUT_OF_RANGE={lead}")
+          PY
+          case "$SIGNAL" in BUY|SELL|WAIT) ;; *) echo "SIGNAL_INVALID=$SIGNAL"; exit 1 ;; esac
+          [ -n "$MESSAGE_ID" ]
+          echo "SIGNAL_E2E=PASS"
+          echo "SIGNAL_DECISION=$SIGNAL"
+          echo "SIGNAL_LEAD_SEC=$LEAD"
+          echo "SIGNAL_TELEGRAM_MESSAGE_ID=$MESSAGE_ID"
+          echo "SIGNAL_SOURCE=BOTRI_MARKET_DATA"
+          echo "IQBINARY_PROCESS_INVOLVEMENT=NONE"
+          REMOTE_SCRIPT
+          )
+          SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
+          COMMANDS_JSON=$(python3 - "$SCRIPT_B64" <<'PY'
+          import json,shlex,sys
+          b64=sys.argv[1]
+          command="printf '%s' "+shlex.quote(b64)+" | base64 -d | bash"
+          print(json.dumps({"commands":[command]}))
+          PY
+          )
+          COMMAND_ID=$(aws ssm send-command --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment "live strategy Telegram signal E2E" --parameters "$COMMANDS_JSON" --query 'Command.CommandId' --output text)
+          echo "SSM_COMMAND_ID=$COMMAND_ID"
+          set +e
+          aws ssm wait command-executed --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+          WAIT_EXIT=$?
+          set -e
+          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" | tee signal-runtime-e2e.json
+          STATUS=$(jq -r '.Status // "Unknown"' signal-runtime-e2e.json)
+          CODE=$(jq -r '.ResponseCode // -1' signal-runtime-e2e.json)
+          OUT=$(jq -r '.StandardOutputContent // ""' signal-runtime-e2e.json)
+          printf '%s\n' "$OUT"
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != Success ] || [ "$CODE" -ne 0 ] || ! printf '%s\n' "$OUT" | grep -q '^SIGNAL_E2E=PASS$'; then exit 1; fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: signal-runtime-e2e-${{ github.run_id }}
+          path: signal-runtime-e2e.json
+          if-no-files-found: warn
