@@ -96,7 +96,7 @@ jobs:
           if [ -z "$DEPLOY_PATH" ]; then
             while IFS= read -r gitdir; do
               candidate="${gitdir%/.git}"
-              origin_url=$(git -C "$candidate" remote get-url origin 2>/dev/null || true)
+              origin_url=$(git -C "$candidate" -c safe.directory="$candidate" remote get-url origin 2>/dev/null || true)
               if printf '%s\n' "$origin_url" | grep -qiE "(^|[/:])${TARGET_REPOSITORY}(\.git)?$"; then
                 DEPLOY_PATH="$candidate"
                 break
@@ -108,13 +108,13 @@ jobs:
             echo REPOSITORY_MISSING_BOOTSTRAP_REQUIRED
             mkdir -p "$(dirname "$BOOTSTRAP_PATH")"
 
-            if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' git ls-remote "$REPO_SSH" HEAD >/dev/null 2>&1; then
+            if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' sudo -u ubuntu -H git ls-remote "$REPO_SSH" HEAD >/dev/null 2>&1; then
               echo BOOTSTRAP_AUTH=ssh
-              git clone --branch "$TARGET_REF" --single-branch "$REPO_SSH" "$BOOTSTRAP_PATH"
+              sudo -u ubuntu -H git clone --branch "$TARGET_REF" --single-branch "$REPO_SSH" "$BOOTSTRAP_PATH"
               DEPLOY_PATH="$BOOTSTRAP_PATH"
-            elif GIT_TERMINAL_PROMPT=0 git ls-remote "$REPO_HTTPS" HEAD >/dev/null 2>&1; then
+            elif GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git ls-remote "$REPO_HTTPS" HEAD >/dev/null 2>&1; then
               echo BOOTSTRAP_AUTH=https-credential-helper
-              git clone --branch "$TARGET_REF" --single-branch "$REPO_HTTPS" "$BOOTSTRAP_PATH"
+              sudo -u ubuntu -H git clone --branch "$TARGET_REF" --single-branch "$REPO_HTTPS" "$BOOTSTRAP_PATH"
               DEPLOY_PATH="$BOOTSTRAP_PATH"
             elif command -v gh >/dev/null 2>&1 && sudo -u ubuntu -H gh auth status >/dev/null 2>&1; then
               echo BOOTSTRAP_AUTH=gh
@@ -128,13 +128,22 @@ jobs:
             fi
           fi
 
+          if [ ! -d "$DEPLOY_PATH/.git" ]; then
+            echo REPOSITORY_BOOTSTRAP_FAILED
+            exit 23
+          fi
+
+          chown -R ubuntu:ubuntu "$DEPLOY_PATH"
+          git config --global --add safe.directory "$DEPLOY_PATH" || true
+
           echo "DEPLOY_PATH=$DEPLOY_PATH"
           git -C "$DEPLOY_PATH" rev-parse --show-toplevel
           git -C "$DEPLOY_PATH" remote -v
-          GIT_TERMINAL_PROMPT=0 git -C "$DEPLOY_PATH" fetch --prune origin
-          git -C "$DEPLOY_PATH" checkout "$TARGET_REF"
-          git -C "$DEPLOY_PATH" reset --ff-only "origin/$TARGET_REF"
-          echo "DEPLOYED_COMMIT=$(git -C "$DEPLOY_PATH" rev-parse HEAD)"
+          GIT_TERMINAL_PROMPT=0 sudo -u ubuntu -H git -C "$DEPLOY_PATH" fetch --prune origin
+          sudo -u ubuntu -H git -C "$DEPLOY_PATH" checkout "$TARGET_REF"
+          sudo -u ubuntu -H git -C "$DEPLOY_PATH" reset --ff-only "origin/$TARGET_REF"
+          DEPLOYED_COMMIT=$(sudo -u ubuntu -H git -C "$DEPLOY_PATH" rev-parse HEAD)
+          echo "DEPLOYED_COMMIT=$DEPLOYED_COMMIT"
 
           if [ "$RUNTIME_ACTION" = restart ] || [ "$RUNTIME_ACTION" = reload ]; then
             PM2_USER=""
@@ -150,7 +159,16 @@ jobs:
               exit 21
             fi
 
-            PM2_APP=$(sudo -u "$PM2_USER" -H bash -lc 'pm2 jlist' | jq -r --arg n "$TARGET_REPOSITORY" '.[] | select((.name|ascii_downcase) == ($n|ascii_downcase)) | .name' | head -1)
+            TARGET_NORMALIZED=$(printf '%s' "$TARGET_REPOSITORY" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]')
+            TARGET_SINGULARIZED=$(printf '%s' "$TARGET_REPOSITORY" | tr '[:upper:]' '[:lower:]' | sed -E 's/signals-bot$/signal-bot/' | tr -cd '[:alnum:]')
+
+            PM2_APP=$(sudo -u "$PM2_USER" -H bash -lc 'pm2 jlist' | jq -r --arg n "$TARGET_NORMALIZED" --arg s "$TARGET_SINGULARIZED" '
+              .[]
+              | .name as $name
+              | ($name | ascii_downcase | gsub("[^a-z0-9]"; "")) as $norm
+              | select($norm == $n or $norm == $s)
+              | $name
+            ' | head -1)
 
             if [ -z "$PM2_APP" ]; then
               echo PM2_APP_NOT_FOUND
