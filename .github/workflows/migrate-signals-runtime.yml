@@ -19,7 +19,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Migrate PM2 runtime from iqbinary to botri-signals-bot
+      - name: Migrate PM2 runtime and verify canonical Telegram path
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
@@ -136,6 +136,9 @@ jobs:
           echo CANONICAL_RUNTIME_CWD=$TARGET
           echo IQBINARY_PROCESS_INVOLVEMENT=NONE
           echo MIGRATION_COMPLETE
+
+          sudo -u ubuntu -H bash -lc "cd '$TARGET' && node scripts/verify-current-candle.js"
+          echo CANONICAL_TELEGRAM_E2E=PASS
           sudo -u ubuntu -H bash -lc 'pm2 status'
           REMOTE_SCRIPT
           )
@@ -155,7 +158,7 @@ jobs:
             --region "$AWS_REGION" \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
-            --comment "botri-infrastructure canonical signals runtime migration" \
+            --comment "botri-infrastructure canonical signals runtime migration and Telegram E2E" \
             --parameters "$COMMANDS_JSON" \
             --query 'Command.CommandId' --output text)
           echo "SSM_COMMAND_ID=$COMMAND_ID"
@@ -177,8 +180,8 @@ jobs:
           printf '%s\n' "$STDOUT"
           printf '%s\n' "$STDERR" >&2
 
-          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != Success ] || [ "$RESPONSE_CODE" -ne 0 ] || ! printf '%s\n' "$STDOUT" | grep -q '^MIGRATION_COMPLETE$'; then
-            echo "Migration failed: status=$STATUS response_code=$RESPONSE_CODE"
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$STATUS" != Success ] || [ "$RESPONSE_CODE" -ne 0 ] || ! printf '%s\n' "$STDOUT" | grep -q '^CANONICAL_TELEGRAM_E2E=PASS$'; then
+            echo "Migration/E2E failed: status=$STATUS response_code=$RESPONSE_CODE"
             exit 1
           fi
 
