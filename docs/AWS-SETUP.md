@@ -30,7 +30,11 @@ Protect production with required reviewers before enabling runtime mutation.
 
 ### 5. EC2 application contract
 
-Each consumer repository must already exist on the EC2 host at its declared application path. The infrastructure workflow only synchronizes and operates the requested application; it does not copy runtime databases into Git.
+Each consumer repository should normally exist on the EC2 host at its declared application path. If the requested repository is missing, the centralized deployment workflow may perform a one-time bootstrap at the declared path, but only through GitHub authentication already available on the EC2 host (SSH, configured Git credential helper, or authenticated GitHub CLI). No token is printed or committed by the workflow.
+
+If no usable GitHub authentication exists on EC2, bootstrap stops with `GITHUB_AUTH_UNAVAILABLE`. In that case, provision a least-privilege repository read mechanism (prefer a dedicated GitHub App/deploy identity) before retrying. Do not add personal credentials to workflow files.
+
+After bootstrap, normal deployments synchronize the repository with `git fetch`, checkout, and fast-forward-only reset. Runtime databases and host state are never copied into Git.
 
 ### 6. Required SSM verification
 
@@ -50,4 +54,4 @@ The old application-owned EC2 workflow in `iqbinary-deriv-lab` is retired. Do no
 
 ## Security rule
 
-Never commit AWS credentials, instance secrets, `.env` files, runtime database files, PM2 dumps, or generated host inventories.
+Never commit AWS credentials, instance secrets, `.env` files, runtime database files, PM2 dumps, generated host inventories, or GitHub access tokens.
