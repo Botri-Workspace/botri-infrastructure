@@ -71,11 +71,23 @@ jobs:
             *) echo 'Rejected: invalid runtime_action'; exit 2 ;;
           esac
 
+          COMMANDS_JSON=$(jq -n \
+            --arg c1 "set -euo pipefail" \
+            --arg c2 "test -d $APPLICATION_PATH/.git" \
+            --arg c3 "git -C $APPLICATION_PATH fetch --prune origin" \
+            --arg c4 "git -C $APPLICATION_PATH checkout $TARGET_REF" \
+            --arg c5 "git -C $APPLICATION_PATH reset --ff-only origin/$TARGET_REF" \
+            --arg c6 "if [ $RUNTIME_ACTION = restart ]; then pm2 restart $TARGET_REPOSITORY; elif [ $RUNTIME_ACTION = reload ]; then pm2 reload $TARGET_REPOSITORY; fi" \
+            --arg c7 "echo DEPLOYMENT_COMPLETE" \
+            --arg c8 "git -C $APPLICATION_PATH rev-parse HEAD" \
+            --arg c9 "pm2 status" \
+            '{commands: [$c1,$c2,$c3,$c4,$c5,$c6,$c7,$c8,$c9]}')
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "botri-infrastructure deployment ${TARGET_REPOSITORY}@${TARGET_REF}" \
-            --parameters commands="set -euo pipefail; test -d '$APPLICATION_PATH/.git'; git -C '$APPLICATION_PATH' fetch --prune origin; git -C '$APPLICATION_PATH' checkout '$TARGET_REF'; git -C '$APPLICATION_PATH' reset --ff-only 'origin/$TARGET_REF'; if [ '$RUNTIME_ACTION' = restart ]; then pm2 restart '$TARGET_REPOSITORY'; elif [ '$RUNTIME_ACTION' = reload ]; then pm2 reload '$TARGET_REPOSITORY'; fi; echo DEPLOYMENT_COMPLETE; git -C '$APPLICATION_PATH' rev-parse HEAD; pm2 status" \
+            --parameters "$COMMANDS_JSON" \
             --query 'Command.CommandId' --output text)
 
           aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
