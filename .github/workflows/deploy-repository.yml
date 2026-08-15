@@ -127,28 +127,66 @@ jobs:
               echo PM2_NOT_AVAILABLE
               exit 21
             fi
-            sudo -u ubuntu -H bash -lc "pm2 restart botri-market-data || pm2 restart botri-market-data-storage"
+            case "$TARGET_REPOSITORY" in
+              botri-signals-bot)
+                sudo -u ubuntu -H bash -lc "pm2 restart botri-signals-bot"
+                ;;
+              botri-market-data)
+                sudo -u ubuntu -H bash -lc "pm2 restart botri-market-data || pm2 restart botri-market-data-storage"
+                ;;
+              *)
+                if sudo -u ubuntu -H bash -lc "pm2 describe '$TARGET_REPOSITORY' >/dev/null 2>&1"; then
+                  sudo -u ubuntu -H bash -lc "pm2 restart '$TARGET_REPOSITORY'"
+                else
+                  echo "PM2_PROCESS_NOT_FOUND=$TARGET_REPOSITORY"
+                  exit 22
+                fi
+                ;;
+            esac
             sleep 2
             sudo -u ubuntu -H bash -lc "pm2 status"
+          fi
+          if [ "$TARGET_REPOSITORY" = botri-signals-bot ]; then
+            sudo -u ubuntu -H bash -lc "cd '$DEPLOY_PATH' && npm run verify:current-candle"
           fi
           echo DEPLOYMENT_COMPLETE'
 
           SCRIPT_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 -w0)
+          COMMANDS_JSON=$(python -c 'import json,os; print(json.dumps(["printf %s | base64 -d | bash -s -- %s %s %s %s" % (os.environ["SCRIPT_B64"], os.environ["APPLICATION_PATH"], os.environ["TARGET_REF"], os.environ["RUNTIME_ACTION"], os.environ["TARGET_REPOSITORY"])]))')
           COMMAND_ID=$(aws ssm send-command \
             --region "$AWS_REGION" \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
-            --comment "botri-market-data EC2 runtime verification" \
-            --parameters "commands=[\"printf '%s' '$SCRIPT_B64' | base64 -d | bash -s -- '$APPLICATION_PATH' '$TARGET_REF' '$RUNTIME_ACTION' '$TARGET_REPOSITORY'\"]" \
+            --comment "${TARGET_REPOSITORY} EC2 deployment" \
+            --parameters "commands=$COMMANDS_JSON" \
             --query 'Command.CommandId' --output text)
           echo "SSM_COMMAND_ID=$COMMAND_ID"
+
+          set +e
           aws ssm wait command-executed --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
-          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" | tee deployment-result.json
+          WAITER_STATUS=$?
+          set -e
+
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" | tee deployment-result.json
+
+          if [ "$WAITER_STATUS" -ne 0 ]; then
+            echo "SSM waiter failed with exit code $WAITER_STATUS"
+            exit "$WAITER_STATUS"
+          fi
+
+          INVOCATION_STATUS=$(python -c 'import json; print(json.load(open("deployment-result.json"))["Status"])')
+          if [ "$INVOCATION_STATUS" != "Success" ]; then
+            echo "SSM invocation status: $INVOCATION_STATUS"
+            exit 1
+          fi
 
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: botri-market-data-ec2-${{ github.run_id }}
+          name: ec2-deployment-${{ inputs.target_repository }}-${{ github.run_id }}
           path: deployment-result.json
           if-no-files-found: warn
