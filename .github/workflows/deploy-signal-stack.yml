@@ -143,18 +143,17 @@ jobs:
           SIGNAL_LOG=$(timeout 75s bash -c '
             while true; do
               LOG=$(sudo -u ubuntu -H bash -lc "pm2 logs botri-signals-bot --lines 200 --nostream 2>&1" || true)
-              FRESH=$(printf "%s\n" "$LOG" | awk -v min_open="'"$PRE_RESTART_MAX_OPEN_TIME"'" \
-                "match(\$0, /Telegram candle\\+signal sent open_time=([0-9]+)/, m) && m[1] > min_open {print; found=1} END {if (!found) exit 1}") || true
-              if [ -n "$FRESH" ] && printf "%s\n" "$FRESH" | grep -Eq "Telegram candle\+signal sent .* message_id=[1-9][0-9]*"; then
+              LATEST_LINE=$(printf "%s\n" "$LOG" | grep -E "Telegram candle\+signal sent open_time=[0-9]+ .*message_id=[1-9][0-9]*" | tail -1 || true)
+              LATEST_OPEN_TIME=$(printf "%s\n" "$LATEST_LINE" | sed -n "s/.*open_time=\([0-9][0-9]*\).*/\1/p")
+              if [ -n "$LATEST_OPEN_TIME" ] && [ "$LATEST_OPEN_TIME" -gt "'"$PRE_RESTART_MAX_OPEN_TIME"'" ]; then
                 printf "%s\n" "$LOG"
-                printf "FRESH_SIGNAL_LINE=%s\n" "$FRESH" >&2
                 exit 0
               fi
               sleep 5
             done
           ')
           printf '%s\n' "$SIGNAL_LOG"
-          SIGNAL_LINE=$(printf '%s\n' "$SIGNAL_LOG" | grep -E "Telegram candle\+signal sent open_time=[0-9]+ .*message_id=[1-9][0-9]*" | awk -v min_open="$PRE_RESTART_MAX_OPEN_TIME" 'match($0, /open_time=([0-9]+)/, m) && m[1] > min_open {line=$0} END {print line}')
+          SIGNAL_LINE=$(printf '%s\n' "$SIGNAL_LOG" | grep -E "Telegram candle\+signal sent open_time=[0-9]+ .*message_id=[1-9][0-9]*" | tail -1)
           [ -n "$SIGNAL_LINE" ] || { echo SIGNAL_FRESH_POST_RESTART_MESSAGE_MISSING; exit 37; }
           printf 'SIGNAL_DELIVERY=%s\n' "$SIGNAL_LINE"
           LEAD_SEC=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*lead_sec=\([0-9.]*\).*/\1/p')
