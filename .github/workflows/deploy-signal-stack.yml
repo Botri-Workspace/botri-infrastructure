@@ -123,6 +123,12 @@ jobs:
           if [ "$MARKET_STATUS" != online ] || ! printf '%s' "$MARKET_PID" | grep -Eq '^[1-9][0-9]*$' || [ "$MARKET_CWD" != "$MARKET_DATA" ]; then echo MARKET_DATA_RUNTIME_NOT_HEALTHY; sudo -u ubuntu -H bash -lc 'pm2 status'; exit 31; fi
 
           sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && grep -q '^TELEGRAM_BOT_TOKEN=' .env && grep -q '^TELEGRAM_CHAT_ID=' .env"
+
+          PRE_RESTART_LOG=$(sudo -u ubuntu -H bash -lc 'pm2 logs botri-signals-bot --lines 200 --nostream 2>&1' || true)
+          PRE_RESTART_MAX_OPEN_TIME=$(printf '%s\n' "$PRE_RESTART_LOG" | sed -n 's/.*Telegram candle+signal sent open_time=\([0-9][0-9]*\).*/\1/p' | sort -n | tail -1)
+          PRE_RESTART_MAX_OPEN_TIME=${PRE_RESTART_MAX_OPEN_TIME:-0}
+          echo "SIGNAL_PRE_RESTART_MAX_OPEN_TIME=$PRE_RESTART_MAX_OPEN_TIME"
+
           sudo -u ubuntu -H bash -lc "cd '$SIGNALS' && BOTRI_MARKET_DATA_SOURCE='botri-market-data' BOTRI_MARKET_DATA_ROOT='$MARKET_DATA' BOTRI_MARKET_DATA_DB='$MARKET_DATA_DB' SIGNAL_TIMEFRAME='60' CURRENT_CANDLE_NOTIFY_LEAD_SEC='3' pm2 startOrRestart ecosystem.config.js --update-env"
           sleep 4
           SIGNAL_STATE=$(sudo -u ubuntu -H bash -lc 'pm2 jlist' | jq -r '.[] | select(.name == "botri-signals-bot") | [(.pm2_env.status // "unknown"), (.pid // 0 | tostring), (.pm2_env.pm_cwd // "")] | @tsv' | head -1)
@@ -137,17 +143,22 @@ jobs:
           SIGNAL_LOG=$(timeout 75s bash -c '
             while true; do
               LOG=$(sudo -u ubuntu -H bash -lc "pm2 logs botri-signals-bot --lines 200 --nostream 2>&1" || true)
-              if printf "%s\n" "$LOG" | grep -Eq "Telegram candle\+signal sent .* message_id=[1-9][0-9]*"; then
+              FRESH=$(printf "%s\n" "$LOG" | awk -v min_open="'"$PRE_RESTART_MAX_OPEN_TIME"'" \
+                "match(\$0, /Telegram candle\\+signal sent open_time=([0-9]+)/, m) && m[1] > min_open {print; found=1} END {if (!found) exit 1}") || true
+              if [ -n "$FRESH" ] && printf "%s\n" "$FRESH" | grep -Eq "Telegram candle\+signal sent .* message_id=[1-9][0-9]*"; then
                 printf "%s\n" "$LOG"
+                printf "FRESH_SIGNAL_LINE=%s\n" "$FRESH" >&2
                 exit 0
               fi
               sleep 5
             done
           ')
           printf '%s\n' "$SIGNAL_LOG"
-          SIGNAL_LINE=$(printf '%s\n' "$SIGNAL_LOG" | grep -E "Telegram candle\+signal sent .* message_id=[1-9][0-9]*" | tail -1)
+          SIGNAL_LINE=$(printf '%s\n' "$SIGNAL_LOG" | grep -E "Telegram candle\+signal sent open_time=[0-9]+ .*message_id=[1-9][0-9]*" | awk -v min_open="$PRE_RESTART_MAX_OPEN_TIME" 'match($0, /open_time=([0-9]+)/, m) && m[1] > min_open {line=$0} END {print line}')
+          [ -n "$SIGNAL_LINE" ] || { echo SIGNAL_FRESH_POST_RESTART_MESSAGE_MISSING; exit 37; }
           printf 'SIGNAL_DELIVERY=%s\n' "$SIGNAL_LINE"
           LEAD_SEC=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*lead_sec=\([0-9.]*\).*/\1/p')
+          SIGNAL_OPEN_TIME=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*open_time=\([0-9]*\).*/\1/p')
           SIGNAL_STATE_VALUE=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*signal=\([^ ]*\).*/\1/p')
           SIGNAL_MESSAGE_ID=$(printf '%s\n' "$SIGNAL_LINE" | sed -n 's/.*message_id=\([0-9]*\).*/\1/p')
           python3 - "$LEAD_SEC" <<'PY'
@@ -156,6 +167,8 @@ jobs:
           if not 2.0 <= lead <= 4.0:
               raise SystemExit(f"SIGNAL_LEAD_OUT_OF_RANGE={lead}")
           PY
+          [ -n "$SIGNAL_OPEN_TIME" ] || { echo SIGNAL_OPEN_TIME_MISSING; exit 38; }
+          [ "$SIGNAL_OPEN_TIME" -gt "$PRE_RESTART_MAX_OPEN_TIME" ] || { echo SIGNAL_NOT_FRESH_AFTER_RESTART; exit 39; }
           [ -n "$SIGNAL_STATE_VALUE" ] || { echo SIGNAL_DECISION_MISSING; exit 34; }
           case "$SIGNAL_STATE_VALUE" in
             BUY|SELL|WAIT) ;;
@@ -163,6 +176,7 @@ jobs:
           esac
           [ -n "$SIGNAL_MESSAGE_ID" ] || { echo SIGNAL_MESSAGE_ID_MISSING; exit 35; }
           echo "SIGNAL_LEAD_SEC=$LEAD_SEC"
+          echo "SIGNAL_OPEN_TIME=$SIGNAL_OPEN_TIME"
           echo "SIGNAL_DECISION=$SIGNAL_STATE_VALUE"
           echo "SIGNAL_TELEGRAM_MESSAGE_ID=$SIGNAL_MESSAGE_ID"
 
